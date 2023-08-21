@@ -7,8 +7,8 @@ const Alert = require('../models/Alert');
 
 const createAxiosInstance = axios.create({
   // Disable retries
-  retries: 1,
-  retryDelay: 0,
+  retries: 3,
+  retryDelay: 1000,
   retryCondition: () => false,
 
   // Set a lower timeout value (e.g., 5 seconds)
@@ -21,7 +21,7 @@ mongoose.set('useFindAndModify', false);
 
 
 const performCronJob5 = async () => {
-    console.log("running cronJob for 5 minute jobs")
+    console.log("running cronJob for 1 minute jobs")
   try {
     // Define pagination parameters
     const pageSize = 100; // Number of monitors to retrieve per page
@@ -33,7 +33,7 @@ const performCronJob5 = async () => {
     // Loop through the pages until all monitors are processed
     while (hasMoreMonitors) {
       monitors = await Monitor.find({
-        frequency: 5,
+        frequency: 1,
         updatedAt: { $lte: new Date(Date.now() - 4 * 60 * 1000) },
         isPaused: false
       }).populate('user');
@@ -51,6 +51,27 @@ const performCronJob5 = async () => {
       // Create an array of promises for each monitor API call
       const monitorPromises = monitors.map(async (monitor) => {
         const { url, port, user,type } = monitor;
+
+         // Retrieve the last recorded uptime status for the monitor
+          const lastUptimeEvent = await UptimeEvent.findOne({
+             monitor: monitor._id,
+          }).sort({ timestamp: -1 });
+
+          let lastUptimeStatus;
+
+           if(type === "web"){
+             lastUptimeStatus = lastUptimeEvent?.availability || "Unknown";
+           }else if(type === "ping"){
+            lastUptimeStatus = lastUptimeEvent?.ping || "Unknown";
+           }else if(type === "port"){
+            lastUptimeStatus = lastUptimeEvent?.port || "Unknown";
+           }else{
+             lastUptimeStatus = "unkown"
+           }
+
+
+         
+
 
         // Select the URL based on the current index using the round-robin algorithm
         const selectedUrl = monitorAgentUrls[currentUrlIndex].url;
@@ -107,14 +128,27 @@ const performCronJob5 = async () => {
 
          
         // Extract the relevant data from the monitor agent response
+
+        let save;
       
         let availability = response?.data?.availability || null;
         let ping = response?.data?.ping || null;
         let portResult = response?.data?.port || null;
 
         console.log(availability,ping,portResult)
+        
+        if(type === "web"){
+          availability === lastUptimeStatus ? save = false : save = true;
+        }else if(type === "ping"){
+          ping === lastUptimeStatus ? save = false : save = true;
+        }else{
+          port === lastUptimeStatus ? save = false : save = true;
+        }
+        
 
         let uptimeEvent;
+
+        
         // Create a new uptime event with the obtained data
           uptimeEvent = new UptimeEvent({
           monitor: mongoose.Types.ObjectId(monitor._id),
@@ -124,7 +158,8 @@ const performCronJob5 = async () => {
           port: portResult === "Open" ? "Open" : "Closed",
           responseTime: responseTime, // Set the response time if available,
           confirmedByAgent: response?.config?.url // Set the URL that did the job
-        });
+         });
+       
         
         // Verify the URL using another monitor agent if it is down
         if (availability === "Down" || ping === "Unreachable" || port === "Closed") {
@@ -158,38 +193,43 @@ const performCronJob5 = async () => {
           }
         }
         //console.log(uptimeEvent,type)
-        if(type === "web" && uptimeEvent.availability === "Down"){
+        if(type === "web" && uptimeEvent?.availability === "Down"){
           console.log("web alert")
           const email = monitor?.user?.email
           const error = `${url} Website is down`
-          sendAlert(email,error)
+          const id = monitor?._id
+          sendAlert(email,error,id)
         }
 
-        if(type === "ping" && uptimeEvent.ping === "Unreachable"){
+        if(type === "ping" && uptimeEvent?.ping === "Unreachable"){
           console.log("ping alert")
           const email = monitor?.user?.email
           const error = `${url} ping is unreachable`
-          sendAlert(email,error)
+          const id = monitor?._id
+          sendAlert(email,error,id)
         }
 
-        if(type === "port" && uptimeEvent.port === "Closed"){
+        if(type === "port" && uptimeEvent?.port === "Closed"){
           console.log("port alert")
           const email = monitor?.user?.email
           const error = `${url} port is closed`
-          sendAlert(email,error)
+          const id = monitor?._id
+          sendAlert(email,error,id)
         }
 
+        if(save === true){
         // Save the uptime event to the database
         await uptimeEvent.save();
-
+        }
 
        // Update the 'updatedAt' field of the corresponding monitor
         await Monitor.findByIdAndUpdate(monitor._id, { updatedAt: new Date() });
       });
+      
     
       // Run all the monitor promises concurrently
       await Promise.all(monitorPromises);
-
+    
       currentPage++;
     }
 
@@ -199,19 +239,50 @@ const performCronJob5 = async () => {
   }
 };
 
-const sendAlert = (email,error)=>{
-  const newAlert = new Alert({
-    message: error,
-    email: email,
-  });
-  
-  newAlert.save()
-    .then((alert) => {
-      console.log('Alert saved:', alert);
-    })
-    .catch((error) => {
-      console.error('Error saving alert:', error);
+const sendAlert = async (email, error, id) => {
+  const monitor = await Monitor.findById(id);
+  console.log(monitor);
+
+  if (!monitor) {
+    console.error(`Monitor with ID ${id} not found`);
+    return;
+  }
+
+  // Get the last alert time from the monitor's data
+  const lastAlertSentAt = monitor?.lastAlertSentAt || null;
+  // Get the alert frequency from the monitor's data
+  const alertFrequency = monitor.alertFrequency || 1; // Default to 1 if not set
+
+  // Get the current time
+  const currentTime = new Date();
+
+  // Calculate the time difference between the current time and the last alert time
+  const timeDifference = lastAlertSentAt ? currentTime - lastAlertSentAt : Infinity;
+
+  // Check if enough time has passed based on the alert frequency
+  if (timeDifference >= alertFrequency * 60 * 1000) {
+
+    const newAlert = new Alert({
+      message: error,
+      email: email,
     });
-}
+
+    // Update the last alert time for the monitor
+    monitor.lastAlertSentAt = currentTime;
+    await monitor.save();
+
+    newAlert.save()
+      .then((alert) => {
+        console.log('Alert saved:', alert);
+      })
+      .catch((error) => {
+        console.error('Error saving alert:', error);
+      });
+
+  } else {
+    console.log(`Not enough time has passed for monitor ID ${id}`);
+  }
+};
+
 
 module.exports = performCronJob5;

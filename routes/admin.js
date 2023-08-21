@@ -1,7 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const User = require("../models/User");
+const Admin = require("../models/Admin");
 const Monitor = require("../models/Monitor");
 const Alert2 = require("../models/Alert2");
 
@@ -10,12 +10,12 @@ const router = express.Router();
 /**
  * @swagger
  * tags:
- *   name: Users
- *   description: The users API
- * /api/user/register:
+ *   name: Admin
+ *   description: The Admin API
+ * /api/admin/register:
  *   post:
  *     summary: Create a new user with email & password
- *     tags: [Users]
+ *     tags: [Admin]
  *     requestBody:
  *       required: true
  *       content:
@@ -43,7 +43,7 @@ router.post("/register", async (req, res) => {
     const { email, password } = req.body;
 
     // Check if email already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await Admin.findOne({ email });
     if (existingUser) {
       return res.status(409).json({ error: "Email already exists" });
     }
@@ -55,7 +55,7 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create a new user
-    const newUser = new User({
+    const newUser = new Admin({
       email,
       password: hashedPassword,
       emailCode: verificationCode,
@@ -78,7 +78,7 @@ router.post("/register", async (req, res) => {
 
 /**
  * @swagger
- *  /api/user/verify-email:
+ *  /api/admin/verify-email:
  *    post:
  *      summary: Verify user's email using verification code
  *      tags: [Users]
@@ -111,7 +111,7 @@ router.post("/verify-email", async (req, res) => {
   try {
     const { email, verificationCode } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -133,10 +133,10 @@ router.post("/verify-email", async (req, res) => {
 
 /**
  * @swagger
- *  /api/user/login:
+ *  /api/admin/login:
  *    post:
  *      summary: User login with email and password
- *      tags: [Users]
+ *      tags: [Admin]
  *      requestBody:
  *        required: true
  *        content:
@@ -166,7 +166,7 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     // Check if the user exists
-    const user = await User.findOne({ email });
+    const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -213,10 +213,10 @@ router.post("/login", async (req, res) => {
 
 /**
  * @swagger
- *  /api/user/login2fa/code:
+ *  /api/admin/login2fa/code:
  *    post:
  *      summary: Generate and send 2FA code to user's email
- *      tags: [Users]
+ *      tags: [Admin]
  *      requestBody:
  *        required: true
  *        content:
@@ -242,7 +242,7 @@ router.post("/login2fa/code", async (req, res) => {
     const { email } = req.body;
 
     // Check if the user exists
-    const user = await User.findOne({ email });
+    const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -267,10 +267,10 @@ router.post("/login2fa/code", async (req, res) => {
 
 /**
  * @swagger
- *  /api/user/login2fa:
+ *  /api/admin/login2fa:
  *    post:
  *      summary: User login with 2FA code
- *      tags: [Users]
+ *      tags: [Admin]
  *      requestBody:
  *        required: true
  *        content:
@@ -301,7 +301,7 @@ router.post("/login2fa", async (req, res) => {
     const { email, password, twoFactorCode } = req.body;
 
     // Check if the user exists
-    const user = await User.findOne({ email });
+    const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -336,10 +336,10 @@ router.post("/login2fa", async (req, res) => {
 
 /**
  * @swagger
- *  /api/user/reset-password/request:
+ *  /api/admin/reset-password/request:
  *    post:
  *      summary: reset password using email
- *      tags: [Users]
+ *      tags: [Admin]
  *      requestBody:
  *        required: true
  *        content:
@@ -364,7 +364,7 @@ router.post("/reset-password/request", async (req, res) => {
     const { email } = req.body;
 
     // Check if the user exists
-    const user = await User.findOne({ email });
+    const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -388,10 +388,10 @@ router.post("/reset-password/request", async (req, res) => {
 
 /**
  * @swagger
- *  /api/user/reset-password/confirm:
+ *  /api/admin/reset-password/confirm:
  *    post:
  *      summary: Confirm password reset with email, code, and new password
- *      tags: [Users]
+ *      tags: [Admin]
  *      requestBody:
  *        required: true
  *        content:
@@ -423,7 +423,7 @@ router.post("/reset-password/confirm", async (req, res) => {
   try {
     const { email, resetCode, newPassword } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -447,309 +447,6 @@ router.post("/reset-password/confirm", async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/user/delete-account/request:
- *   post:
- *     summary: Request account deletion by sending email with code
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *     responses:
- *       200:
- *         description: Deletion code sent successfully
- *       404:
- *         description: User not found
- *       500:
- *         description: An internal server error occurred
- */
-router.post("/delete-account/request", async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Generate a random deletion code
-    const deletionCode = Math.floor(100000 + Math.random() * 900000);
-
-    // Update the user's deletion code and save
-    user.deletionCode = deletionCode.toString();
-    await user.save();
-
-    // Send the deletion code to the user's email
-    await createAndSaveAlert(`your deletion code ${deletionCode}`, email);
-
-    res.status(200).json({ message: "Deletion code sent successfully" });
-  } catch (error) {
-    console.error("Error sending deletion code:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
-  }
-});
-
-/**
- * @swagger
- * /api/user/delete-account/confirm:
- *   post:
- *     summary: Confirm account deletion with email and code
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - deletionCode
- *             properties:
- *               email:
- *                 type: string
- *               deletionCode:
- *                 type: number
- *     responses:
- *       200:
- *         description: Account deletion successful
- *       404:
- *         description: User not found
- *       400:
- *         description: Invalid deletion code
- *       500:
- *         description: An internal server error occurred
- */
-router.post("/delete-account/confirm", async (req, res) => {
-  try {
-    const { email, deletionCode } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (user.deletionCode !== deletionCode) {
-      return res.status(400).json({ error: "Invalid deletion code" });
-    }
-
-    // Delete all monitors belonging to the user
-    await Monitor.deleteMany({ userId: user._id });
-
-    // Delete the user account
-    await user.remove();
-
-    res.status(200).json({ message: "Account deletion successful" });
-  } catch (error) {
-    console.error("Error confirming account deletion:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
-  }
-});
-
-/**
- * @swagger
- * /api/user/add-contact:
- *   post:
- *     summary: Add a contact to a user medium - 'email', 'sms', 'contact' value - email or phone number status - paused or active
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *               medium:
- *                 type: string
- *               value:
- *                 type: string
- *     responses:
- *       200:
- *         description: Contact added successfully
- *       404:
- *         description: User not found
- *       500:
- *         description: An internal server error occurred
- */
-router.post("/add-contact", async (req, res) => {
-  try {
-    const { userId, medium, value } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    user.contacts.push({
-      medium,
-      value,
-      status: "active",
-    });
-
-    await user.save();
-
-    res.status(200).json({ message: "Contact added successfully", user });
-  } catch (error) {
-    console.error("Error adding contact:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
-  }
-});
-
-/**
- * @swagger
- * /api/user/update-contact:
- *   put:
- *     summary: Update a user's contact
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *               contactId:
- *                 type: string
- *               medium:
- *                 type: string
- *               value:
- *                 type: string
- *               status:
- *                 type: string
- *     responses:
- *       200:
- *         description: Contact updated successfully
- *       404:
- *         description: User or contact not found
- *       500:
- *         description: An internal server error occurred
- */
-router.put("/update-contact", async (req, res) => {
-  try {
-    const { userId, contactId, medium, value, status } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const contact = user.contacts.id(contactId);
-    if (!contact) {
-      return res.status(404).json({ error: "Contact not found" });
-    }
-
-    if (medium) contact.medium = medium;
-    if (value) contact.value = value;
-    if (status) contact.status = status;
-
-    await user.save();
-
-    res.status(200).json({ message: "Contact updated successfully", user });
-  } catch (error) {
-    console.error("Error updating contact:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
-  }
-});
-
-/**
- * @swagger
- * /api/user/delete-contact:
- *   delete:
- *     summary: Delete a user's contact
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *               contactId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Contact deleted successfully
- *       404:
- *         description: User or contact not found
- *       500:
- *         description: An internal server error occurred
- */
-router.delete("/delete-contact", async (req, res) => {
-  try {
-    const { userId, contactId } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const contact = user.contacts.id(contactId);
-    if (!contact) {
-      return res.status(404).json({ error: "Contact not found" });
-    }
-
-    contact.remove();
-    await user.save();
-
-    res.status(200).json({ message: "Contact deleted successfully", user });
-  } catch (error) {
-    console.error("Error deleting contact:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
-  }
-});
-
-/**
- * @swagger
- * /api/user/profile:
- *   get:
- *     summary: Get user profile and associated monitors
- *     tags: [Users]
- *     parameters:
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *         required: true
- *         description: ID of the user
- *     responses:
- *       200:
- *         description: User profile retrieved successfully
- *       404:
- *         description: User not found
- *       500:
- *         description: An internal server error occurred
- */
-router.get("/profile", async (req, res) => {
-  try {
-    const userId = req.query.userId;
-
-    const user = await User.findById(userId, "-password -emailCode -resetCode -deletionCode")
-      .populate("monitors", "-_id -userId");
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.status(200).json({ user });
-  } catch (error) {
-    console.error("Error fetching user profile:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
-  }
-});
 
 // Function to create and save an alert
 const createAndSaveAlert = async (message, email) => {

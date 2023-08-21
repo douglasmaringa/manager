@@ -11,10 +11,29 @@ const performCronJob10 = require("./cronJobs/10minute");
 const performCronJob30 = require("./cronJobs/30minute");
 const performCronJob60 = require("./cronJobs/60minute");
 
+// Additional imports for Swagger documentation
+const swaggerJsDoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
+
 
 // Routes imports
 const userRoute = require("./routes/user");
 const monitorRoute = require("./routes/monitor");
+
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Your API Documentation",
+      version: "1.0.0",
+      description: "API documentation for your application",
+    },
+  },
+  apis: ["./routes/*.js"], // Specify the path to your route files
+};
+
+const swaggerSpec = swaggerJsDoc(swaggerOptions);
 
 async function startServer() {
   try {
@@ -81,9 +100,14 @@ async function startServer() {
     app.use(morgan("common"));
     app.use(cors());
 
+    // Serve Swagger documentation
+    app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+
     // Initializing routes
     app.use("/api/user", userRoute);
     app.use("/api/monitor", monitorRoute);
+    app.use("/api/admin", monitorRoute);
 
     // Start the server
     app.listen(8080, () => {
