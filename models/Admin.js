@@ -38,24 +38,10 @@ const adminSchema = new mongoose.Schema({
   deletionCode: {
     type: Number,
   },
-  contacts: [
-    {
-      medium: {
-        type: String,
-        enum: ['email', 'sms', 'contact'], // Add more mediums as needed
-        required: true,
-      },
-      value: {
-        type: String,
-        required: true,
-      },
-      status: {
-        type: String,
-        enum: ['active', 'paused'],
-        default: 'active',
-      }
-    }
-  ],
+  isAdmin: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 module.exports = mongoose.model('Admin', adminSchema);

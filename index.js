@@ -19,6 +19,8 @@ const swaggerUi = require("swagger-ui-express");
 // Routes imports
 const userRoute = require("./routes/user");
 const monitorRoute = require("./routes/monitor");
+const adminRoute = require("./routes/admin");
+const settingsRoute = require("./routes/settings");
 
 // Swagger configuration
 const swaggerOptions = {
@@ -107,7 +109,8 @@ async function startServer() {
     // Initializing routes
     app.use("/api/user", userRoute);
     app.use("/api/monitor", monitorRoute);
-    app.use("/api/admin", monitorRoute);
+    app.use("/api/admin", adminRoute);
+    app.use("/api/settings", settingsRoute);
 
     // Start the server
     app.listen(8080, () => {

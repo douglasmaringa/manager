@@ -42,6 +42,12 @@ router.post("/register", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
     // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -65,7 +71,7 @@ router.post("/register", async (req, res) => {
     await newUser.save();
     // Send the verification code to the user's email
     // Create and save a new alert for registration
-    await createAndSaveAlert(`email verification code ${verificationCode}`, email);
+    await createAndSaveAlert(verificationCode, email, "Registration");
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
@@ -171,6 +177,16 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
+    }
+
     // Check if the account is locked due to too many failed attempts
     if (user.failedLoginAttempts >= 3 && user.lastFailedLoginAt) {
       const lockoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -247,6 +263,16 @@ router.post("/login2fa/code", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
+    }
+
     // Generate a random 6-digit 2FA code
     const twoFactorCode = Math.floor(100000 + Math.random() * 900000);
 
@@ -256,7 +282,7 @@ router.post("/login2fa/code", async (req, res) => {
 
     // Send the 2FA code to the user's email
     
-    await createAndSaveAlert(`your login code ${twoFactorCode}`, email);
+    await createAndSaveAlert(twoFactorCode, email , "2FA");
 
     res.status(200).json({ message: "2FA code sent successfully" });
   } catch (error) {
@@ -304,6 +330,16 @@ router.post("/login2fa", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
     }
 
     // Check if the password is correct
@@ -369,6 +405,16 @@ router.post("/reset-password/request", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
+    }
+
     // Generate a random 6-digit reset code
     const resetCode = Math.floor(100000 + Math.random() * 900000);
 
@@ -377,7 +423,7 @@ router.post("/reset-password/request", async (req, res) => {
     await user.save();
 
     // Send the reset code to the user's email
-    await createAndSaveAlert(`your reset code ${resetCode}`, email);
+    await createAndSaveAlert(resetCode, email , "PasswordReset");
 
     res.status(200).json({ message: "Reset code sent successfully" });
   } catch (error) {
@@ -426,6 +472,16 @@ router.post("/reset-password/confirm", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
     }
 
     if (user.resetCode !== resetCode) {
@@ -481,6 +537,16 @@ router.post("/delete-account/request", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
+    }
+
     // Generate a random deletion code
     const deletionCode = Math.floor(100000 + Math.random() * 900000);
 
@@ -489,7 +555,7 @@ router.post("/delete-account/request", async (req, res) => {
     await user.save();
 
     // Send the deletion code to the user's email
-    await createAndSaveAlert(`your deletion code ${deletionCode}`, email);
+    await createAndSaveAlert(deletionCode, email ,"DeleteAccount");
 
     res.status(200).json({ message: "Deletion code sent successfully" });
   } catch (error) {
@@ -535,6 +601,16 @@ router.post("/delete-account/confirm", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the email has been verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: "Email has not been verified" });
+    }
+
+    // Check if the user is active
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Contact Admin your account has been deactivated" });
     }
 
     if (user.deletionCode !== deletionCode) {
@@ -588,6 +664,11 @@ router.post("/add-contact", async (req, res) => {
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if adding the new contact would exceed the maximum allowed contacts
+    if (user?.contacts?.length >= user?.maxContacts) {
+      return res.status(400).json({ error: "Maximum contacts limit reached" });
     }
 
     user.contacts.push({
@@ -752,10 +833,11 @@ router.get("/profile", async (req, res) => {
 });
 
 // Function to create and save an alert
-const createAndSaveAlert = async (message, email) => {
+const createAndSaveAlert = async (message, email ,type) => {
   const newAlert = new Alert2({
     message,
     email,
+    type
   });
   try {
     await newAlert.save();

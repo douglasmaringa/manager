@@ -1,6 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const Monitor = require("../models/Monitor");
+const User = require("../models/User");
 const UptimeEvent = require("../models/UptimeEvent");
 const router = express.Router();
 
@@ -47,6 +48,23 @@ router.post("/monitors", verifyToken, async (req, res) => {
     // Extract user ID from the token
     const userId = req.user.userId;
     const port2 =  port || 443;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user?._id == userId) {
+      return res.status(404).json({ error: "This is not your account" });
+    }
+
+     // Find all monitors belonging to the user
+     const monitors = await Monitor.find({ user: userId });
+     
+    // Check if the user has reached their maximum monitors limit
+    if (monitors?.length >= user?.maxMonitors) {
+      return res.status(400).json({ error: 'Maximum monitors limit reached' });
+    }
 
     // Create a new monitor for the user
     const newMonitor = new Monitor({
@@ -255,17 +273,39 @@ router.post("/monitoring/stats", verifyToken, async (req, res) => {
     // Extract user ID from the token
     const userId = req.user.userId;
 
-    // Count the total number of monitors for the user
-    const totalMonitors = await Monitor.countDocuments({ user: userId });
+    // Fetch all monitors belonging to the user
+    const userMonitors = await Monitor.find({ user: userId });
 
-    // Count the number of monitors that are paused
-    const pausedMonitors = await Monitor.countDocuments({ user: userId, isPaused: true });
+    let upMonitors = 0;
+    let downMonitors = 0;
+    let pausedMonitors = 0;
 
-    // Count the number of monitors that are up
-    const upMonitors = await Monitor.countDocuments({ user: userId, isPaused: true });
+    // Loop through each monitor to determine its status based on the latest uptime event
+    for (const monitor of userMonitors) {
+      if (monitor.isPaused) {
+        pausedMonitors++;
+        continue; // Skip the rest of the loop for paused monitors
+      }
 
-    // Count the number of monitors that are down
-    const downMonitors = await Monitor.countDocuments({ user: userId, isPaused: false });
+      // Fetch the latest uptime event for the monitor
+      const latestUptimeEvent = await UptimeEvent.findOne({ monitor: monitor._id }).sort({ timestamp: -1 });
+
+      if (!latestUptimeEvent) {
+        // If no uptime events are found, assume the monitor is down
+        downMonitors++;
+      } else if (
+        (latestUptimeEvent.availability === "Up") ||
+        (latestUptimeEvent.ping === "Reachable" || latestUptimeEvent.port === "Open")
+      ) {
+        // If the latest uptime event indicates the monitor is up
+        upMonitors++;
+      } else {
+        // If the latest uptime event indicates the monitor is down
+        downMonitors++;
+      }
+    }
+
+    const totalMonitors = userMonitors.length;
 
     res.status(200).json({
       totalMonitors,
@@ -278,6 +318,8 @@ router.post("/monitoring/stats", verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+
 
 /**
  * @swagger
@@ -418,8 +460,8 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
           downtimeEventCriteria = { availability: 'Down' };
         } else if (monitor.type === 'ping') {
           downtimeEventCriteria = { ping: 'Unreachable' };
-        }else {
-          downtimeEventCriteria = {  port: 'Closed' };
+        } else {
+          downtimeEventCriteria = { port: 'Closed' };
         }
 
         const latestDowntimeEvent = await UptimeEvent.findOne({
@@ -428,9 +470,13 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
         }).sort({ timestamp: -1 });
 
         if (latestDowntimeEvent) {
+          const currentTime = new Date();
+          const downtimeDuration = currentTime - latestDowntimeEvent.timestamp;
+
           latestDowntimeForMonitors.push({
             monitorId: monitor._id,
             latestDowntimeEvent,
+            downtimeDuration,
           });
         }
       }
@@ -534,20 +580,25 @@ router.put("/monitors/:id", verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
-
 /**
  * @swagger
- * /api/monitor/monitors/{id}:
+ * /api/monitor/monitors/remove:
  *   delete:
  *     summary: Delete a monitor
  *     tags: [Monitors]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *         description: ID of the monitor to be deleted
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               monitorId:
+ *                 type: string
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
  *     responses:
  *       200:
  *         description: Monitor deleted successfully
@@ -557,13 +608,11 @@ router.put("/monitors/:id", verifyToken, async (req, res) => {
  *         description: An internal server error occurred
  */
 
-
-
 // Delete a monitor
-router.delete("/monitors/:id", async (req, res) => {
+router.delete("/monitors/remove",verifyToken, async (req, res) => {
   try {
-    const monitorId = req.params.id;
-
+    const monitorId = req.body.monitorId;
+   
     // Find the monitor and ensure it belongs to the user
     const monitor = await Monitor.findOne({ _id: monitorId, user: req.user.userId });
     if (!monitor) {

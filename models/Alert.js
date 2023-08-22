@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 
 const alertSchema = new mongoose.Schema({
-      message: {
-        type: String,
-        required: true,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
       },
-      email: {
+      url: {
         type: String,
         required: true,
       },

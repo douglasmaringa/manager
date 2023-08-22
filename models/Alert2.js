@@ -4,6 +4,17 @@ const alertSchema2 = new mongoose.Schema({
       message: {
         type: String,
         required: true,
+      }, 
+      type: {
+        type: String,
+        enum: [
+          'Up',
+          'Down',
+          'Registration',
+          '2FA',
+          'PasswordReset',
+          'DeleteAccount',
+        ],
       },
       email: {
         type: String,

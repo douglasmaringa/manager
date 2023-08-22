@@ -195,26 +195,23 @@ const performCronJob1 = async () => {
         //console.log(uptimeEvent,type)
         if(type === "web" && uptimeEvent?.availability === "Down"){
           console.log("web alert")
-          const email = monitor?.user?.email
-          const error = `${url} Website is down`
+          const userId = monitor?.user?._id
           const id = monitor?._id
-          sendAlert(email,error,id)
+          sendAlert(userId,url,id)
         }
 
         if(type === "ping" && uptimeEvent?.ping === "Unreachable"){
           console.log("ping alert")
-          const email = monitor?.user?.email
-          const error = `${url} ping is unreachable`
+          const userId = monitor?.user?._id
           const id = monitor?._id
-          sendAlert(email,error,id)
+          sendAlert(userId,url,id)
         }
 
         if(type === "port" && uptimeEvent?.port === "Closed"){
           console.log("port alert")
-          const email = monitor?.user?.email
-          const error = `${url} port is closed`
+          const userId = monitor?.user?._id
           const id = monitor?._id
-          sendAlert(email,error,id)
+          sendAlert(userId,url,id)
         }
 
         if(save === true){
@@ -239,9 +236,9 @@ const performCronJob1 = async () => {
   }
 };
 
-const sendAlert = async (email, error, id) => {
+const sendAlert = async (userId,url,id) => {
   const monitor = await Monitor.findById(id);
-  console.log(monitor);
+  //console.log(monitor);
 
   if (!monitor) {
     console.error(`Monitor with ID ${id} not found`);
@@ -259,12 +256,16 @@ const sendAlert = async (email, error, id) => {
   // Calculate the time difference between the current time and the last alert time
   const timeDifference = lastAlertSentAt ? currentTime - lastAlertSentAt : Infinity;
 
+  if(!userId){
+    return;
+  }
+
   // Check if enough time has passed based on the alert frequency
   if (timeDifference >= alertFrequency * 60 * 1000) {
-
+    
     const newAlert = new Alert({
-      message: error,
-      email: email,
+      userId:userId,
+      url:url,
     });
 
     // Update the last alert time for the monitor

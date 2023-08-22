@@ -56,6 +56,22 @@ const userSchema = new mongoose.Schema({
       }
     }
   ],
+  isAdmin: {
+    type: Boolean,
+    default: false,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  maxMonitors:{
+    type: Number,
+    default: 10,
+  },
+  maxContacts:{
+    type: Number,
+    default: 2,
+  },
 });
 
 module.exports = mongoose.model('User', userSchema);
