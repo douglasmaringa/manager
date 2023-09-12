@@ -2,7 +2,7 @@ const Monitor = require("../models/Monitor");
 const UptimeEvent = require("../models/UptimeEvent");
 const axios = require("axios");
 const mongoose = require('mongoose');
-const monitorAgentUrls = require('../monitorAgentUrls');
+const MonitorAgent = require('../models/MonitorAgent'); 
 const Alert = require('../models/Alert');
 
 const createAxiosInstance = axios.create({
@@ -23,6 +23,16 @@ mongoose.set('useFindAndModify', false);
 const performCronJob60 = async () => {
     console.log("running cronJob for 60 minute jobs")
   try {
+     // Fetch monitor URLs from the database
+     const monitorUrlsFromDB = await MonitorAgent.find({type:"monitorAgents"});
+
+     // Check if there are monitor URLs in the database
+     if (monitorUrlsFromDB.length === 0) {
+         console.error("No monitor URLs found in the database.");
+         return;
+     }
+
+     //console.log(monitorUrlsFromDB)
     // Define pagination parameters
     const pageSize = 100; // Number of monitors to retrieve per page
     let currentPage = 1; // Current page
@@ -74,10 +84,10 @@ const performCronJob60 = async () => {
 
 
         // Select the URL based on the current index using the round-robin algorithm
-        const selectedUrl = monitorAgentUrls[currentUrlIndex].url;
+        const selectedUrl = monitorUrlsFromDB[currentUrlIndex].url;
 
         // Update the current URL index for the next iteration
-        currentUrlIndex = (currentUrlIndex + 1) % monitorAgentUrls.length;
+        currentUrlIndex = (currentUrlIndex + 1) % monitorUrlsFromDB.length;
 
         // Create a timer to measure the response time
         const startTimestamp = new Date().getTime();
@@ -95,7 +105,7 @@ const performCronJob60 = async () => {
         } catch (error) {
           console.error("Error in monitor request:", error);
           // Find a different monitor agent URL
-          const differentAgentUrl = monitorAgentUrls.find(
+          const differentAgentUrl = monitorUrlsFromDB.find(
             (urlObj) => urlObj.url !== selectedUrl
           );
 
@@ -164,7 +174,7 @@ const performCronJob60 = async () => {
         // Verify the URL using another monitor agent if it is down
         if (availability === "Down" || ping === "Unreachable" || port === "Closed") {
           // Find a different monitor agent URL
-          const differentAgentUrl = monitorAgentUrls.find(
+          const differentAgentUrl = monitorUrlsFromDB.find(
             (urlObj) => urlObj.url !== selectedUrl
           );
 

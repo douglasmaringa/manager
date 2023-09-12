@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const Admin = require("../models/Admin");
 const UptimeEvent = require("../models/UptimeEvent");
+const IpAddress = require('../models/IpAddress');
 const User = require("../models/User");
 const Monitor = require("../models/Monitor");
 const Alert2 = require("../models/Alert2");
@@ -428,7 +429,7 @@ router.post("/reset-password/confirm", async (req, res) => {
  * @swagger
  * /api/admin/message-templates:
  *   post:
- *     summary: Create a new message template
+ *     summary: Create a new message template type can be (Up,Down,Registration, 2FA, PasswordReset, DeleteAccount, UserDeletion)
  *     tags: [Admin]
  *     requestBody:
  *       required: true
@@ -460,6 +461,15 @@ router.post("/message-templates",verifyToken, async (req, res) => {
   try {
     const { type, message } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     // Check if a message template with the same type already exists
     const existingTemplate = await MessageTemplate.findOne({ type });
     if (existingTemplate) {
@@ -484,21 +494,41 @@ router.post("/message-templates",verifyToken, async (req, res) => {
 
 /**
  * @swagger
- * /api/admin/message-templates:
- *   get:
+ * /api/admin/fetchmessage-templates:
+ *   post:
  *     summary: get all message templates
  *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Message template updated successfully
+ *         description: Message template fetched successfully
  *       404:
  *         description: Message template not found
  *       500:
  *         description: An internal server error occurred
  */
 // Get all message templates
-router.get("/message-templates", async (req, res) => {
+router.post("/fetchmessage-templates",verifyToken, async (req, res) => {
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const templates = await MessageTemplate.find();
     res.status(200).json(templates);
   } catch (error) {
@@ -545,6 +575,16 @@ router.get("/message-templates", async (req, res) => {
 router.put("/message-templates/edit",verifyToken, async (req, res) => {
   try {
     const {id, type, message } = req.body;
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
 
     // Find the template by ID
     const template = await MessageTemplate.findById(id);
@@ -597,6 +637,16 @@ router.put("/message-templates/edit",verifyToken, async (req, res) => {
 // Delete a message template
 router.delete("/message-templates/delete",verifyToken, async (req, res) => {
   try {
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     
     // Find the template by ID
     const template = await MessageTemplate.findById(req.body.id);
@@ -649,6 +699,16 @@ router.put("/user/activated",verifyToken, async (req, res) => {
   const userId = req.body.id;
 
   try {
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
 
     const admin = await Admin.findById(req.user.userId);
     console.log(admin)
@@ -710,6 +770,15 @@ router.put("/user/deactivate",verifyToken, async (req, res) => {
   const userId = req.body.id;
 
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
 
     const admin = await Admin.findById(req.user.userId);
     
@@ -763,6 +832,15 @@ router.put("/user/deactivate",verifyToken, async (req, res) => {
 // Route to get all users and their monitors
 router.post('/all-users-monitors',verifyToken, async (req, res) => {
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const admin = await Admin.findById(req.user.userId);
     
     // Check if the user is an admin
@@ -848,6 +926,15 @@ router.put('/edit-user-limits',verifyToken, async (req, res) => {
   const userId = req.body.userId;
 
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const admin = await Admin.findById(req.user.userId);
     
     // Check if the user is an admin
@@ -944,6 +1031,15 @@ const createAndSaveAlert = async (message, email ,type) => {
 // Create a new monitor
 router.post("/monitors", verifyToken, async (req, res) => {
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const admin = await Admin.findById(req.user.userId);
     
     // Check if the user is an admin
@@ -1026,6 +1122,15 @@ router.post("/monitors", verifyToken, async (req, res) => {
 // Update a monitor and set isPaused to true
 router.put("/monitors/pause", verifyToken, async (req, res) => {
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const admin = await Admin.findById(req.user.userId);
     
     // Check if the user is an admin
@@ -1085,6 +1190,15 @@ router.put("/monitors/pause", verifyToken, async (req, res) => {
 // Delete a monitor
 router.delete("/monitors/remove",verifyToken, async (req, res) => {
   try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const admin = await Admin.findById(req.user.userId);
     
     // Check if the user is an admin
@@ -1111,6 +1225,256 @@ router.delete("/monitors/remove",verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/ip-addresses:
+ *   post:
+ *     summary: Add a new IP address
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - address
+ *               - token
+ *             properties:
+ *               address:
+ *                 type: string
+ *               token:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: IP address added successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       500:
+ *         description: An internal server error occurred
+ */
+router.post('/ip-addresses',verifyToken, async (req, res) => {
+  
+  try {
+    const admin = await Admin.findById(req.user.userId);
+    
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: "Access Denied you are not an admin" });
+    }
+    const { address } = req.body;
+
+    // Create a new IP address record
+    const ipAddress = new IpAddress({ address });
+    await ipAddress.save();
+
+    res.status(201).json({ message: 'IP address added successfully' });
+  } catch (error) {
+    console.error('Error adding IP address:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/ip-addresses:
+ *   delete:
+ *     summary: Delete an IP address by ID
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *               - token
+ *             properties:
+ *               id:
+ *                 type: string
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: IP address deleted successfully
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       404:
+ *         description: IP address not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+router.delete('/ip-addresses',verifyToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.user.userId);
+    
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: "Access Denied you are not an admin" });
+    }
+    const { id } = req.body;
+
+    // Check if the IP address exists
+    const ipAddress = await IpAddress.findById(id);
+
+    if (!ipAddress) {
+      return res.status(404).json({ error: 'IP address not found' });
+    }
+
+    // Delete the IP address record
+    await IpAddress.findByIdAndDelete(id);
+
+    res.json({ message: 'IP address deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting IP address:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/ip-addresses:
+ *   put:
+ *     summary: Edit an IP address by ID
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *               - token
+ *               - address
+ *             properties:
+ *               id:
+ *                 type: string
+ *               token:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: IP address edited successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       404:
+ *         description: IP address not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+router.put('/ip-addresses',verifyToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req?.user?.userId);
+    
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: "Access Denied you are not an admin" });
+    }
+   
+    const {id, address } = req.body;
+
+    // Check if the IP address exists
+    const ipAddress = await IpAddress.findById(id);
+
+    if (!ipAddress) {
+      return res.status(404).json({ error: 'IP address not found' });
+    }
+
+    // Update the IP address record
+    ipAddress.address = address;
+    await ipAddress.save();
+
+    res.json({ message: 'IP address edited successfully' });
+  } catch (error) {
+    console.error('Error editing IP address:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
+
+/**
+ * @swagger
+ * /api/admin/all-ips:
+ *   post:
+ *     summary: Get all ip addresses
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: List of users and their monitors
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       500:
+ *         description: An internal server error occurred
+ */
+
+// Route to get all users and their monitors
+router.post('/all-ips',verifyToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.user.userId);
+    
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: "Access Denied you are not an admin" });
+    }
+
+    // Find all users
+    const ips = await IpAddress.find();
+
+
+    res.status(200).json(ips);
+  } catch (error) {
+    console.error('Error fetching users and monitors:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
+
+
+
+// Protected API route
+router.get('/protected', checkIpAddress, (req, res) => {
+  res.json({ message: 'This is a protected API route.' });
+});
+
+
+// Middleware to check if the request's IP address is allowed
+async function  checkIpAddress (req, res, next) {
+ 
+  try {
+    const clientIpAddress = req.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
+    // IP address is allowed, proceed to the route handler
+    next();
+  } catch (error) {
+    console.error('Error checking IP address:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 
 
