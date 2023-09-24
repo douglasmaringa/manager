@@ -643,6 +643,8 @@ router.post("/delete-account/confirm", async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
+ *               token:
+ *                 type: string
  *               userId:
  *                 type: string
  *               medium:
@@ -657,7 +659,7 @@ router.post("/delete-account/confirm", async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-router.post("/add-contact", async (req, res) => {
+router.post("/add-contact", verifyToken, async (req, res) => {
   try {
     const { userId, medium, value } = req.body;
 
@@ -688,6 +690,54 @@ router.post("/add-contact", async (req, res) => {
 
 /**
  * @swagger
+ * /api/user/list-contacts:
+ *   post:
+ *     summary: List contacts for a user
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *               userId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: List of contacts for the user
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+
+
+// Route to list contacts for a user
+router.post("/list-contacts",verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Get the contacts for the user
+    const contacts = user.contacts;
+
+    res.status(200).json({ contacts });
+  } catch (error) {
+    console.error("Error listing contacts:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+
+/**
+ * @swagger
  * /api/user/update-contact:
  *   put:
  *     summary: Update a user's contact
@@ -699,6 +749,8 @@ router.post("/add-contact", async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
+ *               token:
+ *                 type: string
  *               userId:
  *                 type: string
  *               contactId:
@@ -717,7 +769,7 @@ router.post("/add-contact", async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-router.put("/update-contact", async (req, res) => {
+router.put("/update-contact",verifyToken, async (req, res) => {
   try {
     const { userId, contactId, medium, value, status } = req.body;
 
@@ -757,6 +809,8 @@ router.put("/update-contact", async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
+ *               token:
+ *                 type: string
  *               userId:
  *                 type: string
  *               contactId:
@@ -769,7 +823,7 @@ router.put("/update-contact", async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-router.delete("/delete-contact", async (req, res) => {
+router.delete("/delete-contact",verifyToken, async (req, res) => {
   try {
     const { userId, contactId } = req.body;
 
@@ -845,6 +899,25 @@ const createAndSaveAlert = async (message, email ,type) => {
     console.error("Error creating alert:", error);
   }
 };
+
+// Middleware function to verify the JWT token
+function verifyToken(req, res, next) {
+  const token = req.body.token;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  jwt.verify(token, 'secret', (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    req.user = decoded;
+    next();
+  });
+}
+
 
 
 module.exports = router;

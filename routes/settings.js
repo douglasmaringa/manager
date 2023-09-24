@@ -211,7 +211,7 @@ router.delete('/delete/monitor/:id', verifyToken, async (req, res) => {
  * @swagger
  * /api/settings/all-monitors:
  *   post:
- *     summary: Get all monitor agents
+ *     summary: Get all monitor agents with pagination
  *     tags: [Settings]
  *     security:
  *       - bearerAuth: []
@@ -223,12 +223,28 @@ router.delete('/delete/monitor/:id', verifyToken, async (req, res) => {
  *             type: object
  *             required:
  *               - token
+ *               - page
  *             properties:
  *               token:
  *                 type: string
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
  *     responses:
  *       200:
- *         description: List of all monitor agents
+ *         description: List of monitor agents on the current page
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 monitors:
+ *                   type: array
+ *                   description: List of monitor agents on the current page
+ *                 totalPages:
+ *                   type: integer
+ *                   description: Total number of pages
  *       403:
  *         description: Access Denied you are not an admin
  *       500:
@@ -243,14 +259,122 @@ router.post('/all-monitors', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Access Denied you are not an admin' });
     }
 
-    const monitors = await MonitorAgent.find();
+    // Extract the page number from the request body
+    const { page } = req.body;
 
-    res.status(200).json(monitors);
+    // Define the page size (number of monitor agents per page)
+    const pageSize = 10; // Set your desired page size
+
+    // Count the total number of monitor agents
+    const totalMonitors = await MonitorAgent.countDocuments();
+
+    // Calculate the total pages
+    const totalPages = Math.ceil(totalMonitors / pageSize);
+
+    // Calculate the skip value based on the page number
+    const skip = (page - 1) * pageSize;
+
+    // Fetch monitor agents with pagination
+    const monitors = await MonitorAgent.find()
+      .skip(skip)
+      .limit(pageSize);
+
+    res.status(200).json({ monitors, totalPages });
   } catch (error) {
     console.error('Error fetching monitor agents:', error);
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
+
+/**
+ * @swagger
+ * /api/settings/all-monitors/search:
+ *   post:
+ *     summary: Search monitor agents by Ip Address with pagination
+ *     tags: [Settings]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - url
+ *             properties:
+ *               token:
+ *                 type: string
+ *               url:
+ *                 type: string
+ *                 description: URL to search for
+ *                 example: "http://example.com"
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: List of monitor agents matching the URL on the current page
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 monitors:
+ *                   type: array
+ *                   description: List of monitor agents matching the URL on the current page
+ *                 totalPages:
+ *                   type: integer
+ *                   description: Total number of pages
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       500:
+ *         description: An internal server error occurred
+ */
+
+// Search monitor agents by URL with pagination
+router.post('/all-monitors/search', verifyToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.user.userId);
+
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: 'Access Denied you are not an admin' });
+    }
+
+    // Extract the URL and page number from the request body
+    const { url, page } = req.body;
+
+    // Define the page size (number of monitor agents per page)
+    const pageSize = 10; // Set your desired page size
+
+    // Count the total number of monitor agents matching the URL search criteria
+    const totalMonitors = await MonitorAgent.countDocuments({
+      url: { $regex: url, $options: 'i' }, // Case-insensitive URL search
+    });
+
+    // Calculate the total pages
+    const totalPages = Math.ceil(totalMonitors / pageSize);
+
+    // Calculate the skip value based on the page number
+    const skip = (page - 1) * pageSize;
+
+    // Fetch monitor agents matching the URL search criteria with pagination
+    const monitors = await MonitorAgent.find({
+      url: { $regex: url, $options: 'i' }, // Case-insensitive URL search
+    })
+      .skip(skip)
+      .limit(pageSize);
+
+    res.status(200).json({ monitors, totalPages });
+  } catch (error) {
+    console.error('Error searching monitor agents by URL:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
 
 /**
  * @swagger

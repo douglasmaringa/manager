@@ -91,7 +91,7 @@ router.post("/monitors", verifyToken, async (req, res) => {
  * @swagger
  * /api/monitor/monitors/all:
  *   post:
- *     summary: Get all monitors that belong to a user
+ *     summary: Get monitors that belong to a user with pagination
  *     tags: [Monitors]
  *     requestBody:
  *       required: true
@@ -104,25 +104,55 @@ router.post("/monitors", verifyToken, async (req, res) => {
  *                 type: string
  *                 description: JWT token obtained after login
  *                 example: "your_jwt_token_here"
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
  *     responses:
  *       200:
  *         description: Monitors retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 monitors:
+ *                   type: array
+ *                   description: List of monitors on the current page
+ *                 totalPages:
+ *                   type: integer
+ *                   description: Total number of pages
  *       404:
  *         description: User not found
  *       500:
  *         description: An internal server error occurred
  */
 
-// Fetch all monitors for the user
+// Fetch monitors for the user with pagination
 router.post("/monitors/all", verifyToken, async (req, res) => {
   try {
     // Extract user ID from the token
     const userId = req.user.userId;
 
-    // Find all monitors belonging to the user
-    const monitors = await Monitor.find({ user: userId });
+    // Extract the page number from the request body
+    const { page } = req.body;
+    const pageSize = 10; // Set your desired page size
 
-    res.status(200).json({ monitors });
+    // Count the total number of monitors belonging to the user
+    const totalMonitors = await Monitor.countDocuments({ user: userId });
+
+    // Calculate the total pages
+    const totalPages = Math.ceil(totalMonitors / pageSize);
+
+    // Calculate the skip value based on the page number
+    const skip = (page - 1) * pageSize;
+
+    // Find monitors belonging to the user with pagination
+    const monitors = await Monitor.find({ user: userId })
+      .skip(skip)
+      .limit(pageSize);
+
+    res.status(200).json({ monitors, totalPages });
   } catch (error) {
     console.error("Error fetching monitors:", error);
     res.status(500).json({ error: "An internal server error occurred" });
@@ -131,9 +161,91 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
 
 /**
  * @swagger
+ * /api/monitor/monitors/search:
+ *   post:
+ *     summary: Search monitors that belong to a user with pagination
+ *     tags: [Monitors]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
+ *               url:
+ *                 type: string
+ *                 description: Search term for filtering monitors
+ *                 example: "monitor_url"
+ *     responses:
+ *       200:
+ *         description: Monitors retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 monitors:
+ *                   type: array
+ *                   description: List of monitors matching the search criteria on the current page
+ *                 totalPages:
+ *                   type: integer
+ *                   description: Total number of pages
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+// Search monitors by URL for the user with pagination
+router.post("/monitors/search", verifyToken, async (req, res) => {
+  try {
+    // Extract user ID from the token
+    const userId = req.user.userId;
+
+    // Extract the page number and URL search term from the request body
+    const { page, url } = req.body;
+    const pageSize = 10; // Set your desired page size
+
+    // Count the total number of monitors matching the URL search criteria
+    const totalMonitors = await Monitor.countDocuments({
+      user: userId,
+      url: { $regex: url, $options: "i" }, // Case-insensitive URL search
+    });
+
+    // Calculate the total pages
+    const totalPages = Math.ceil(totalMonitors / pageSize);
+
+    // Calculate the skip value based on the page number
+    const skip = (page - 1) * pageSize;
+
+    // Find monitors matching the URL search criteria with pagination
+    const monitors = await Monitor.find({
+      user: userId,
+      url: { $regex: url, $options: "i" }, // Case-insensitive URL search
+    })
+      .skip(skip)
+      .limit(pageSize);
+
+    res.status(200).json({ monitors, totalPages });
+  } catch (error) {
+    console.error("Error searching monitors:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+
+/**
+ * @swagger
  * /api/monitor/monitors/uptimeevents:
  *   post:
- *     summary: Get all uptime events for a monitor, sorted by latest
+ *     summary: Get uptime events for a monitor, sorted by latest, with pagination
  *     tags: [Monitors]
  *     requestBody:
  *       required: true
@@ -143,6 +255,7 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
  *             type: object
  *             required:
  *               - id
+ *               - page
  *             properties:
  *               token:
  *                 type: string
@@ -150,6 +263,10 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
  *                 example: "your_jwt_token_here"
  *               id:
  *                 type: string
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
  *     responses:
  *       200:
  *         description: Uptime events retrieved successfully
@@ -159,33 +276,54 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
  *         description: An internal server error occurred
  */
 
-
-// Fetch all uptime events for a monitor, sorted by latest
+// Fetch uptime events for a monitor, sorted by latest, with pagination
 router.post("/monitors/uptimeevents", verifyToken, async (req, res) => {
   try {
-    const { id } = req.body;
+    const { id, page } = req.body;
 
-     // Extract user ID from the token
+    // Extract user ID from the token
     const userId = req.user.userId;
 
-      // Find the monitor and ensure it belongs to the user
-      const monitor = await Monitor.findOne({ _id: id, user: userId });
-      if (!monitor) {
-        return res.status(404).json({ error: "Monitor not found" });
-      }
+    // Find the monitor and ensure it belongs to the user
+    const monitor = await Monitor.findOne({ _id: id, user: userId });
+    if (!monitor) {
+      return res.status(404).json({ error: "Monitor not found" });
+    }
 
-      // Fetch all uptime events for the monitor, sorted by the latest
-      const uptimeEvents = await UptimeEvent.find({ monitor: id })
-        .sort({ timestamp: -1 })
-        .exec();
+    // Define the page size (number of uptime events per page)
+    const pageSize = 10; // Set your desired page size
 
-      res.status(200).json({ Url:monitor?.url,frequency:monitor?.frequency,port:monitor?.port,uptimeEvents:uptimeEvents,type:monitor?.type });
-    
+    // Calculate the skip value based on the page number
+    const skip = (page - 1) * pageSize;
+
+     // Count the total number of monitors belonging to the user
+     const totalMonitors = await UptimeEvent.countDocuments({ monitor: id });
+
+     // Calculate the total pages
+     const totalPages = Math.ceil(totalMonitors / pageSize);
+ 
+
+    // Fetch uptime events for the monitor, sorted by the latest, with pagination
+    const uptimeEvents = await UptimeEvent.find({ monitor: id })
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .exec();
+
+    res.status(200).json({
+      Url: monitor?.url,
+      frequency: monitor?.frequency,
+      port: monitor?.port,
+      uptimeEvents,
+      type: monitor?.type,
+      totalPages:totalPages,
+    });
   } catch (error) {
     console.error("Error fetching uptime events:", error);
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
 
 /**
  * @swagger
