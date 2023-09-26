@@ -189,6 +189,11 @@ router.post("/login2fa/code", async (req, res) => {
       return res.status(403).json({ error: "Access Denied you are not an admin" });
     }
 
+    // Check if the email has been verified
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Admin has not activated this account" });
+    }
+
     // Generate a random 6-digit 2FA code
     const twoFactorCode = Math.floor(100000 + Math.random() * 900000);
 
@@ -248,6 +253,11 @@ router.post("/login2fa", async (req, res) => {
     const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Check if the email has been verified
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Admin has not activated this account" });
     }
 
     // Check if the email has been verified
@@ -325,6 +335,11 @@ router.post("/reset-password/request", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Check if the email has been verified
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Admin has not activated this account" });
+    }
+
     // Check if the user is an admin
     if (!user.isAdmin) {
       return res.status(403).json({ error: "Access Denied you are not an admin" });
@@ -394,6 +409,11 @@ router.post("/reset-password/confirm", async (req, res) => {
     const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the email has been verified
+    if (!user.isActive) {
+      return res.status(403).json({ error: "Admin has not activated this account" });
     }
 
     // Check if the email has been verified
@@ -491,6 +511,61 @@ router.post("/message-templates",verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+/**
+ * @swagger
+ * /api/admin/activate:
+ *   put:
+ *     summary: Activate an admin user with a valid token and admin user ID
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - adminId
+ *             properties:
+ *               token:
+ *                 type: string
+ *               adminId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Admin user activated successfully
+ *       400:
+ *         description: Invalid request - Missing token or adminId
+ *       401:
+ *         description: Unauthorized - Invalid token
+ *       404:
+ *         description: Admin not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+router.put("/activate", verifyToken, async (req, res) => {
+  try {
+    const { adminId } = req.body;
+
+    if (!adminId) {
+      return res.status(400).json({ error: "Invalid request - Missing adminId" });
+    }
+
+    // Update the isActive field to true for the admin with the given ID
+    const updatedAdmin = await Admin.findByIdAndUpdate(adminId, { isActive: true }, { new: true });
+
+    if (!updatedAdmin) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    res.status(200).json({ message: "Admin user activated successfully" });
+  } catch (error) {
+    console.error("Error activating admin:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
 
 /**
  * @swagger
@@ -704,7 +779,7 @@ router.delete("/message-templates/delete",verifyToken, async (req, res) => {
  * @swagger
  * /api/admin/user/activated:
  *   put:
- *     summary: Activate a user
+ *     summary: Activate a user account after deactivating
  *     tags: [Admin]
  *     requestBody:
  *       required: true
