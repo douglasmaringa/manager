@@ -47,6 +47,15 @@ router.post("/register", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -120,6 +129,15 @@ router.post("/verify-email", async (req, res) => {
   try {
     const { email, verificationCode } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const user = await Admin.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -172,6 +190,15 @@ router.post("/verify-email", async (req, res) => {
 router.post("/login2fa/code", async (req, res) => {
   try {
     const { email } = req.body;
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
 
     // Check if the user exists
     const user = await Admin.findOne({ email });
@@ -248,6 +275,15 @@ router.post("/login2fa/code", async (req, res) => {
 router.post("/login2fa", async (req, res) => {
   try {
     const { email, password, twoFactorCode } = req.body;
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
 
     // Check if the user exists
     const user = await Admin.findOne({ email });
@@ -329,6 +365,15 @@ router.post("/reset-password/request", async (req, res) => {
   try {
     const { email } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     // Check if the user exists
     const user = await Admin.findOne({ email });
     if (!user) {
@@ -405,6 +450,15 @@ router.post("/reset-password/request", async (req, res) => {
 router.post("/reset-password/confirm", async (req, res) => {
   try {
     const { email, resetCode, newPassword } = req.body;
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
 
     const user = await Admin.findOne({ email });
     if (!user) {
@@ -548,6 +602,15 @@ router.put("/activate", verifyToken, async (req, res) => {
   try {
     const { adminId } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     if (!adminId) {
       return res.status(400).json({ error: "Invalid request - Missing adminId" });
     }
@@ -612,7 +675,7 @@ router.put("/activate", verifyToken, async (req, res) => {
 router.post("/fetchmessage-templates", verifyToken, async (req, res) => {
   try {
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
-    console.log(clientIpAddress)
+    //console.log(clientIpAddress)
     // Check if the client's IP address exists in the database
     const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
 
@@ -914,7 +977,7 @@ router.put("/user/deactivate",verifyToken, async (req, res) => {
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
-
+/*
 /**
  * @swagger
  * /api/admin/all-users-monitors:
@@ -957,6 +1020,7 @@ router.put("/user/deactivate",verifyToken, async (req, res) => {
  *         description: An internal server error occurred
  */
 // Get all users and their monitors with pagination
+/*
 router.post('/all-users-monitors', verifyToken, async (req, res) => {
   try {
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
@@ -1031,12 +1095,12 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
-
+*/
 /**
  * @swagger
- * /api/admin/all-users-monitors/search:
+ * /api/admin/all-users-monitors:
  *   post:
- *     summary: Search for users and their monitors
+ *     summary: Get all users with pagination and optional search by email
  *     tags: [Admin]
  *     requestBody:
  *       required: true
@@ -1046,30 +1110,28 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
  *             type: object
  *             required:
  *               - token
- *               - searchQuery
  *               - page
  *             properties:
  *               token:
  *                 type: string
- *               searchQuery:
- *                 type: string
- *                 description: Search query for users or monitors
- *                 example: "user@example.com"  # Replace with an example search query
  *               page:
  *                 type: integer
  *                 description: Page number for pagination
  *                 example: 1
+ *               search:
+ *                 type: string
+ *                 description: Search term to filter users by email (optional)
  *     responses:
  *       200:
- *         description: List of users and their monitors matching the search query on the current page
+ *         description: List of users on the current page
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 usersWithMonitors:
+ *                 users:
  *                   type: array
- *                   description: List of users and their monitors matching the search query on the current page
+ *                   description: List of users on the current page
  *                 totalPages:
  *                   type: integer
  *                   description: Total number of pages
@@ -1078,9 +1140,7 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-
-// Search for users and their monitors with pagination
-router.post('/all-users-monitors/search', verifyToken, async (req, res) => {
+router.post('/all-users-monitors', verifyToken, async (req, res) => {
   try {
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
 
@@ -1098,21 +1158,17 @@ router.post('/all-users-monitors/search', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Access Denied you are not an admin' });
     }
 
-    // Extract the search query and page number from the request body
-    const { searchQuery, page } = req.body;
+    // Extract the page number and search term (if provided) from the request body
+    const { page, search } = req.body;
 
     // Define the page size (number of users per page)
     const pageSize = 10; // Set your desired page size
 
-    // Build a search filter for users based on the search query
-    const userSearchFilter = {
-      $or: [
-        { email: { $regex: searchQuery, $options: 'i' } }, // Case-insensitive email search
-      ],
-    };
+    // Construct the query to search users by email if a search term is provided
+    const userQuery = search ? { email: { $regex: search, $options: 'i' } } : {};
 
-    // Count the total number of users matching the search query
-    const totalUsers = await User.countDocuments(userSearchFilter);
+    // Count the total number of users based on the search query
+    const totalUsers = await User.countDocuments(userQuery);
 
     // Calculate the total pages
     const totalPages = Math.ceil(totalUsers / pageSize);
@@ -1120,44 +1176,115 @@ router.post('/all-users-monitors/search', verifyToken, async (req, res) => {
     // Calculate the skip value based on the page number
     const skip = (page - 1) * pageSize;
 
-    // Find users matching the search query with pagination
-    const users = await User.find(userSearchFilter)
+    // Modify the query to exclude the 'password' field
+    const users = await User.find(userQuery)
+      .select('-password') // Exclude the 'password' field
       .skip(skip)
       .limit(pageSize);
 
-    const usersWithMonitors = [];
+    res.status(200).json({ users, totalPages });
+  } catch (error) {
+    console.error('Error fetching users and monitors:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
 
-    // Loop through each user and populate their monitors
-    for (const user of users) {
-      const userWithMonitors = {
-        _id: user._id,
-        email: user.email,
-        isActive: user.isActive,
-        monitors: [],
-      };
+/**
+ * @swagger
+ * /api/admin/user-monitors:
+ *   post:
+ *     summary: Get monitors for a specific user with pagination and search leave search plank to return all monitors for the user
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - userId
+ *             properties:
+ *               token:
+ *                 type: string
+ *               userId:
+ *                 type: string
+ *                 description: ID of the user whose monitors to retrieve
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
+ *               search:
+ *                 type: string
+ *                 description: Search term to filter monitors (optional)
+ *     responses:
+ *       200:
+ *         description: List of monitors belonging to the user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 monitors:
+ *                   type: array
+ *                   description: List of monitors belonging to the user
+ *                 totalPages:
+ *                   type: integer
+ *                   description: Total number of pages
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       500:
+ *         description: An internal server error occurred
+ */
+router.post('/user-monitors', verifyToken, async (req, res) => {
+  try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
 
-      const monitors = await Monitor.find({ user: user._id });
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
 
-      // Populate monitors for the user
-      userWithMonitors.monitors = monitors.map((monitor) => ({
-        _id: monitor._id,
-        url: monitor.url,
-        port: monitor.port,
-        type: monitor.type,
-        isPaused: monitor.isPaused,
-        frequency: monitor.frequency,
-        alertFrequency: monitor.alertFrequency,
-        lastAlertSentAt: monitor.lastAlertSentAt,
-        createdAt: monitor.createdAt,
-        updatedAt: monitor.updatedAt,
-      }));
-
-      usersWithMonitors.push(userWithMonitors);
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
     }
 
-    res.status(200).json({ usersWithMonitors, totalPages });
+    const admin = await Admin.findById(req.user.userId);
+
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: 'Access Denied you are not an admin' });
+    }
+
+    const { userId, page, search } = req.body;
+
+    // Define the page size (number of monitors per page)
+    const pageSize = 10; // Set your desired page size
+    const skip = (page - 1) * pageSize;
+
+    let monitorQuery = { user: userId };
+
+    if (search) {
+      // If a search term is provided, filter monitors by the search term
+      monitorQuery = {
+        ...monitorQuery,
+       
+          url: { $regex: search, $options: 'i' }, // Case-insensitive URL 
+      };
+    }
+
+    // Count the total number of monitors for the user (with optional search)
+    const totalMonitors = await Monitor.countDocuments(monitorQuery);
+
+    // Calculate the total pages
+    const totalPages = Math.ceil(totalMonitors / pageSize);
+
+    // Find monitors for the specified user (with optional search)
+    const monitors = await Monitor.find(monitorQuery)
+      .skip(skip)
+      .limit(pageSize);
+
+    res.status(200).json({ monitors, totalPages });
   } catch (error) {
-    console.error('Error searching users and monitors:', error);
+    console.error('Error fetching monitors for the user:', error);
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
@@ -1865,6 +1992,15 @@ router.post("/admin/add-contact", verifyToken, async (req, res) => {
   try {
     const { userId, medium, value } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -1926,6 +2062,15 @@ router.post("/admin/view-contacts", verifyToken, async (req, res) => {
   try {
     const { userId } = req.body;
 
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -1977,6 +2122,15 @@ router.post("/admin/view-contacts", verifyToken, async (req, res) => {
 router.delete("/admin/delete-contact", verifyToken, async (req, res) => {
   try {
     const { userId, contactId } = req.body;
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
 
     const user = await User.findById(userId);
     if (!user) {
