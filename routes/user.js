@@ -681,7 +681,7 @@ router.post("/add-contact", verifyToken, async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: "Contact added successfully", user });
+    res.status(200).json({ message: "Contact added successfully" });
   } catch (error) {
     console.error("Error adding contact:", error);
     res.status(500).json({ error: "An internal server error occurred" });
@@ -789,7 +789,7 @@ router.put("/update-contact",verifyToken, async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: "Contact updated successfully", user });
+    res.status(200).json({ message: "Contact updated successfully" });
   } catch (error) {
     console.error("Error updating contact:", error);
     res.status(500).json({ error: "An internal server error occurred" });
@@ -840,7 +840,7 @@ router.delete("/delete-contact",verifyToken, async (req, res) => {
     contact.remove();
     await user.save();
 
-    res.status(200).json({ message: "Contact deleted successfully", user });
+    res.status(200).json({ message: "Contact deleted successfully" });
   } catch (error) {
     console.error("Error deleting contact:", error);
     res.status(500).json({ error: "An internal server error occurred" });
@@ -850,16 +850,22 @@ router.delete("/delete-contact",verifyToken, async (req, res) => {
 /**
  * @swagger
  * /api/user/profile:
- *   get:
+ *   post:
  *     summary: Get user profile and associated monitors
  *     tags: [Users]
- *     parameters:
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *         required: true
- *         description: ID of the user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *               userId:
+ *                 type: string
+ *               contactId:
+ *                 type: string
  *     responses:
  *       200:
  *         description: User profile retrieved successfully
@@ -868,7 +874,7 @@ router.delete("/delete-contact",verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-router.get("/profile", async (req, res) => {
+router.post("/profile",verifyToken, async (req, res) => {
   try {
     const userId = req.query.userId;
 

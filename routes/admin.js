@@ -612,7 +612,7 @@ router.put("/activate", verifyToken, async (req, res) => {
 router.post("/fetchmessage-templates", verifyToken, async (req, res) => {
   try {
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
-
+    console.log(clientIpAddress)
     // Check if the client's IP address exists in the database
     const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
 
@@ -1426,6 +1426,75 @@ router.put("/monitors/pause", verifyToken, async (req, res) => {
     await monitor.save();
 
     res.status(200).json({ message: "Monitor paused successfully" });
+  } catch (error) {
+    console.error("Error pausing monitor:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/monitors/resume:
+ *   put:
+ *     summary: resume a paused monitor
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - id
+ *             properties:
+ *               token:
+ *                 type: string
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Monitor resumed successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       404:
+ *         description: Monitor not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+// Update a monitor and set isPaused to true
+router.put("/monitors/resume", verifyToken, async (req, res) => {
+  try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
+    const admin = await Admin.findById(req.user.userId);
+    
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: "Access Denied you are not an admin" });
+    }
+
+    const monitorId = req.body.id;
+    // Find the monitor and ensure it belongs to the user
+    const monitor = await Monitor.findOne({ _id: monitorId });
+    if (!monitor) {
+      return res.status(404).json({ error: "Monitor not found" });
+    }
+
+    // Update the monitor and set isPaused to true
+    monitor.isPaused = !monitor.isPaused;
+    await monitor.save();
+
+    res.status(200).json({ message: "Monitor resumed successfully" });
   } catch (error) {
     console.error("Error pausing monitor:", error);
     res.status(500).json({ error: "An internal server error occurred" });

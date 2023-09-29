@@ -101,6 +101,7 @@ async function startServer() {
     app.use(helmet());
     app.use(morgan("common"));
     app.use(cors());
+    app.set('trust proxy',true); 
 
     // Serve Swagger documentation
     app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
