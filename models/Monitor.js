@@ -9,6 +9,12 @@ const monitorSchema = new mongoose.Schema({
   url: {
     type: String,
     required: true,
+    unique: true,
+  },
+  name: {
+    type: String,
+    required: true,
+    unique: true,
   },
   port: {
     type: Number,
@@ -36,6 +42,11 @@ const monitorSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  stats: {
+    type: String,
+    default: null,
+  },
+  contacts: [{ type: String }],
 }, { timestamps: true }); // Add timestamps option to automatically create 'createdAt' and 'updatedAt' fields
 
 module.exports = mongoose.model('Monitor', monitorSchema);

@@ -162,6 +162,7 @@ const performCronJob1 = async () => {
         // Create a new uptime event with the obtained data
           uptimeEvent = new UptimeEvent({
           monitor: mongoose.Types.ObjectId(monitor._id),
+          userId: monitor.user,
           timestamp: new Date(),
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
@@ -275,6 +276,7 @@ const sendAlert = async (userId,url,id) => {
     
     const newAlert = new Alert({
       userId:userId,
+      monitorId:id,
       url:url,
     });
 

@@ -4,6 +4,7 @@ const Monitor = require("../models/Monitor");
 const User = require("../models/User");
 const UptimeEvent = require("../models/UptimeEvent");
 const router = express.Router();
+const mongoose = require('mongoose');
 
 /**
  * @swagger
@@ -26,6 +27,8 @@ const router = express.Router();
  *                 default: when you login you got a token paste that token here
  *               url:
  *                 type: string
+ *               name:
+ *                 type: string
  *               port:
  *                 type: number
  *               frequency:
@@ -34,6 +37,11 @@ const router = express.Router();
  *                 type: string
  *               alertFrequency:
  *                 type: number
+ *               contacts:
+ *                 type: array
+ *                 items:
+ *                   type: string 
+ *                   default: []   
  *     responses:
  *       201:
  *         description: Monitor created successfully
@@ -43,7 +51,7 @@ const router = express.Router();
 // Create a new monitor
 router.post("/monitors", verifyToken, async (req, res) => {
   try {
-    const { url,port,frequency,type,alertFrequency } = req.body;
+    const { url,name,port,frequency,type,alertFrequency,contacts } = req.body;
 
     // Extract user ID from the token
     const userId = req.user.userId;
@@ -70,11 +78,13 @@ router.post("/monitors", verifyToken, async (req, res) => {
     const newMonitor = new Monitor({
       user: userId,
       url,
+      name,
       type,
       isPaused: false,
       port:port2,
       frequency,
-      alertFrequency:alertFrequency || 1
+      alertFrequency:alertFrequency || 1,
+      contacts: contacts || [], // Set the 'contacts' property
     });
 
     // Save the monitor to the database
@@ -128,18 +138,44 @@ router.post("/monitors", verifyToken, async (req, res) => {
  *         description: An internal server error occurred
  */
 
-// Fetch monitors for the user with pagination
 router.post("/monitors/all", verifyToken, async (req, res) => {
   try {
     // Extract user ID from the token
     const userId = req.user.userId;
 
-    // Extract the page number from the request body
-    const { page } = req.body;
-    const pageSize = 10; // Set your desired page size
+    // Extract request body parameters
+    const { page, sortByName, typeFilter, statusFilter, searchText } = req.body;
+    const pageSize = 7; // Set your desired page size
 
-    // Count the total number of monitors belonging to the user
-    const totalMonitors = await Monitor.countDocuments({ user: userId });
+    // Define the sort criteria based on user input
+    const sortCriteria = {};
+
+    if (sortByName) {
+      // Sort by name in ascending order by default
+      sortCriteria.name = sortByName === "desc" ? -1 : 1;
+    } else {
+      // Sort by the latest monitors if sortByName is not included
+      sortCriteria.createdAt = -1; // Sort by createdAt in descending order (latest first)
+    }
+
+    // Define the filter criteria
+    const filterCriteria = {};
+
+    if (typeFilter && typeFilter !== "all") {
+      filterCriteria.type = typeFilter;
+    }
+
+    if (statusFilter && statusFilter !== "all") {
+      filterCriteria.isPaused = statusFilter === "paused";
+    }
+
+    if (searchText !== "") {
+      // Add fuzzy name search condition if searchText is provided
+      filterCriteria.name = { $regex: new RegExp(searchText, "i") }; // Case-insensitive fuzzy search
+    }
+
+    // Count the total number of monitors belonging to the user with the applied filters
+    const totalMonitors = await Monitor.countDocuments({ user: userId, ...filterCriteria });
 
     // Calculate the total pages
     const totalPages = Math.ceil(totalMonitors / pageSize);
@@ -147,10 +183,18 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
     // Calculate the skip value based on the page number
     const skip = (page - 1) * pageSize;
 
-    // Find monitors belonging to the user with pagination
-    const monitors = await Monitor.find({ user: userId })
+    // Find monitors belonging to the user with pagination, filtering, and sorting
+    const monitors = await Monitor.find({ user: userId, ...filterCriteria })
+      .sort(sortCriteria)
       .skip(skip)
       .limit(pageSize);
+
+    // Loop through monitors and calculate average uptime for each
+    for (const monitor of monitors) {
+      const avgUptime24h = await calculateAverageUptime(1, monitor._id);
+      // Add the calculated stats to each monitor
+      monitor.stats = avgUptime24h;
+    }
 
     res.status(200).json({ monitors, totalPages });
   } catch (error) {
@@ -158,6 +202,50 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+
+const calculateAverageUptime = async (durationInDays, id) => {
+  // Get the date 'durationInDays' ago
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - durationInDays);
+
+  // Fetch all uptime events within the specified duration for the user's monitors
+  const uptimeEvents = await UptimeEvent.find({
+    timestamp: { $gte: startDate },
+    monitor:id
+  }).sort({ timestamp: 1 });
+
+  // If there are no uptime events within the duration, assume the monitor was up the entire time
+  if (uptimeEvents.length === 0) {
+    return 100; // 100% uptime
+  }
+
+  // Calculate the total time the monitors were up within the duration
+  let totalUpTime = 0;
+  let lastTimestamp = startDate;
+
+  for (const event of uptimeEvents) {
+    const timeDifference = event.timestamp - lastTimestamp;
+    if (event.availability === 'Up' || event.ping === 'Reachable' || event.port === 'Open') {
+      totalUpTime += timeDifference;
+    }
+    lastTimestamp = event.timestamp;
+  }
+
+  // If the last event was 'Up', consider uptime until the current time
+  if (uptimeEvents[uptimeEvents.length - 1].availability === 'Up' || uptimeEvents[uptimeEvents.length - 1].ping === 'Reachable' || uptimeEvents[uptimeEvents.length - 1].port === 'Open') {
+    const currentTime = new Date();
+    const timeDifference = currentTime - lastTimestamp;
+    totalUpTime += timeDifference;
+  }
+
+  // Calculate average uptime
+  const totalDuration = durationInDays * 24 * 60 * 60 * 1000; // Convert days to milliseconds
+  const averageUptime = (totalUpTime / totalDuration) * 100; // Percentage
+
+  return averageUptime.toFixed(0); // Return average uptime rounded to 2 decimal places
+};
+
 
 /**
  * @swagger
@@ -383,6 +471,65 @@ router.put("/monitors/:id/pause", async (req, res) => {
 
 /**
  * @swagger
+ * /api/monitor/monitors/bulk-pause:
+ *   put:
+ *     summary: Pause or Resume multiple monitors in bulk
+ *     tags: [Monitors]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
+ *               monitorIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: An array of monitor IDs to pause or resume
+ *                 example: ["monitor_id_1", "monitor_id_2"]
+ *               pause:
+ *                 type: boolean
+ *                 description: true to pause monitors, false to resume
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Monitors bulk paused or resumed successfully
+ *       404:
+ *         description: Monitor not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+
+// Bulk pause or resume monitors
+router.put("/monitors/bulk-pause", async (req, res) => {
+  try {
+    const { monitorIds, pause, token } = req.body;
+
+    // Find and update monitors in bulk based on the provided monitor IDs
+    const updateResult = await Monitor.updateMany(
+      { _id: { $in: monitorIds } },
+      { $set: { isPaused: pause } }
+    );
+
+    if (updateResult.nModified === 0) {
+      return res.status(404).json({ error: "No monitors were found for the provided IDs" });
+    }
+
+    res.status(200).json({ message: "Monitors bulk paused or resumed successfully" });
+  } catch (error) {
+    console.error("Error bulk pausing monitors:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+
+/**
+ * @swagger
  * /api/monitor/monitoring/stats:
  *   post:
  *     summary: Get monitoring statistics
@@ -577,59 +724,316 @@ router.post("/monitoring/uptime", verifyToken, async (req, res) => {
  *         description: An internal server error occurred
  */
 
+/**
+ * @swagger
+ * /api/monitor/monitoring/latest-downtime:
+ *   post:
+ *     summary: Get latest downtime event
+ *     tags: [Monitors]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
+ *     responses:
+ *       200:
+ *         description: Latest downtime event retrieved successfully
+ *       500:
+ *         description: An internal server error occurred
+ */
 
-// Fetch latest downtime event for all monitors belonging to a user
+/**
+ * @swagger
+ * /api/monitor/monitoring/latest-downtime:
+ *   post:
+ *     summary: Get latest downtime event
+ *     tags: [Monitors]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
+ *     responses:
+ *       200:
+ *         description: Latest downtime event retrieved successfully
+ *       500:
+ *         description: An internal server error occurred
+ */
+
+// Fetch the latest downtime event from the entire system
 router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
+  try {
+    // Find the latest downtime event across all monitors
+    const latestDowntimeEvent = await UptimeEvent.findOne({
+      $or: [
+        { availability: 'Down' },
+        { port: 'Closed' },
+        { ping: 'Unreachable' }
+      ]
+    }).sort({ timestamp: -1 })
+      .populate('monitor', 'name');
+
+    if (latestDowntimeEvent) {
+      const currentTime = new Date();
+      const downtimeDuration = currentTime - latestDowntimeEvent.timestamp;
+
+      // Prepare the response data
+      const response = {
+        monitorId: latestDowntimeEvent.monitor._id,
+        name: latestDowntimeEvent.monitor.name,
+        timestamp: latestDowntimeEvent.timestamp,
+        duration: downtimeDuration,
+      };
+
+      res.status(200).json(response);
+    } else {
+      res.status(404).json({ message: 'No downtime events found in the system' });
+    }
+  } catch (error) {
+    console.error("Error fetching latest downtime event:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+
+
+
+/**
+ * @swagger
+ * /api/monitor/monitoring/updown:
+ *   post:
+ *     summary: Get latest events for all monitors with pagination
+ *     tags: [Monitors]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
+ *               page:
+ *                 type: integer
+ *                 description: Page number for pagination
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: Latest events retrieved successfully
+ *       500:
+ *         description: An internal server error occurred
+ */
+router.post("/monitoring/updown", verifyToken, async (req, res) => {
+  try {
+    // Extract user ID from the token
+    const userId = req.user.userId;
+    const page = req.body.page || 1; // Get the page number from the request body, default to 1 if not provided
+    const pageSize = 10; // Set your desired page size
+
+    // Function to determine event type based on availability, ping, and port
+    const determineEventType = (event) => {
+      if (event.availability === 'Up' || event.ping === 'Reachable' || event.port === 'Open') {
+        return 'Uptime';
+      } else {
+        return 'Downtime';
+      }
+    };
+
+    const fetchLatestEventsForUser = async (userId, page) => {
+      // Find all the latest uptime events for the user and populate the 'monitor' field
+      const latestEventsForUser = await UptimeEvent.aggregate([
+        {
+          $match: { userId: mongoose.Types.ObjectId(userId) }
+        },
+        {
+          $sort: { "monitor": 1, timestamp: -1 } // Sort by monitor and timestamp
+        },
+        {
+          $group: {
+            _id: "$monitor",
+            latestEvent: { $first: "$$ROOT" }
+          }
+        },
+        {
+          $replaceRoot: { newRoot: "$latestEvent" }
+        },
+        {
+          $lookup: {
+            from: "monitors", // Replace with the actual collection name for monitors
+            localField: "monitor",
+            foreignField: "_id",
+            as: "monitor"
+          }
+        },
+        {
+          $unwind: "$monitor"
+        },
+        {
+          $project: {
+            "monitor.isPaused": 1,
+            "monitor.name": 1,
+            "monitor.type": 1, // Add any other monitor fields you need
+            "_id": 0, // Exclude the _id field if needed
+            uptimeEvent: "$$ROOT",
+          }
+        }
+      ]);
+
+      // Calculate the total number of pages
+      const totalEvents = latestEventsForUser.length;
+      const totalPages = Math.ceil(totalEvents / pageSize);
+
+      // Get events for the specified page
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = page * pageSize;
+      const eventsForPage = latestEventsForUser.slice(startIndex, endIndex);
+
+      // Determine event type for each event and include timestamp and status
+      const eventsWithAvailability = eventsForPage.map((event) => {
+        const eventType = determineEventType(event.uptimeEvent);
+        const status = event.uptimeEvent.availability || event.uptimeEvent.ping || event.uptimeEvent.port; // Replace with the actual status field in your UptimeEvent schema
+
+        return {
+          monitorId: event.monitor._id,
+          isPaused: event.monitor.isPaused,
+          name: event.monitor.name,
+          type: event.monitor.type,
+          timestamp: event.uptimeEvent.timestamp, // Corrected to access timestamp from uptimeEvent
+          status: status,
+          duration: eventType,
+          type: eventType,
+        };
+      });
+
+      return { totalEvents, totalPages, events: eventsWithAvailability };
+    };
+
+    const result = await fetchLatestEventsForUser(userId, page);
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching latest events:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+
+/**
+ * @swagger
+ * /api/monitor/monitoring/alluptimestats:
+ *   post:
+ *     summary: Get overall uptime statistics
+ *     tags: [Monitors]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token obtained after login
+ *                 example: "your_jwt_token_here"
+ *     responses:
+ *       200:
+ *         description: Overall uptime statistics retrieved successfully
+ *       500:
+ *         description: An internal server error occurred
+ */
+
+router.post("/monitoring/alluptimestats", verifyToken, async (req, res) => {
   try {
     // Extract user ID from the token
     const userId = req.user.userId;
 
-    const fetchLatestDowntimeForMonitors = async (userId) => {
-      // Fetch all monitors belonging to the user
-      const monitors = await Monitor.find({ user: userId });
+    // Fetch all uptime events for the user
+    const uptimeEvents = await UptimeEvent.find({ userId });
 
-      const latestDowntimeForMonitors = [];
+    // Calculate average uptime percentage for the last 24 hours
+    const uptimePercentage24h = calculateAverageUptime2(
+      24 * 60 * 60 * 1000,
+      uptimeEvents
+    );
 
-      // Loop through each monitor and find its latest downtime event
-      for (const monitor of monitors) {
-        let downtimeEventCriteria = {};
+    // Calculate average uptime percentage for the last 7 days
+    const uptimePercentage7d = calculateAverageUptime2(
+      7 * 24 * 60 * 60 * 1000,
+      uptimeEvents
+    );
 
-        if (monitor.type === 'web') {
-          downtimeEventCriteria = { availability: 'Down' };
-        } else if (monitor.type === 'ping') {
-          downtimeEventCriteria = { ping: 'Unreachable' };
-        } else {
-          downtimeEventCriteria = { port: 'Closed' };
-        }
+    // Calculate average uptime percentage for the last 30 days
+    const uptimePercentage30d = calculateAverageUptime2(
+      30 * 24 * 60 * 60 * 1000,
+      uptimeEvents
+    );
 
-        const latestDowntimeEvent = await UptimeEvent.findOne({
-          monitor: monitor._id,
-          ...downtimeEventCriteria,
-        }).sort({ timestamp: -1 });
-
-        if (latestDowntimeEvent) {
-          const currentTime = new Date();
-          const downtimeDuration = currentTime - latestDowntimeEvent.timestamp;
-
-          latestDowntimeForMonitors.push({
-            monitorId: monitor._id,
-            latestDowntimeEvent,
-            downtimeDuration,
-          });
-        }
-      }
-
-      return latestDowntimeForMonitors;
-    };
-
-    const latestDowntime = await fetchLatestDowntimeForMonitors(userId);
-
-    res.status(200).json(latestDowntime);
+    res.status(200).json({
+      uptimePercentage24h: uptimePercentage24h.toFixed(2),
+      uptimePercentage7d: uptimePercentage7d.toFixed(2),
+      uptimePercentage30d: uptimePercentage30d.toFixed(2),
+    });
   } catch (error) {
-    console.error("Error fetching latest downtime:", error);
+    console.error("Error fetching uptime events:", error);
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+function calculateAverageUptime2(durationInMilliseconds, uptimeEvents) {
+  const currentTime = new Date();
+  const thresholdTime = new Date(currentTime - durationInMilliseconds);
+
+  // Filter uptime events within the specified duration
+  const recentUptimeEvents = uptimeEvents.filter((event) => {
+    // Check if availability is "Up," ping is "Reachable," or port is "Open"
+    if (
+      event.availability === "Up" ||
+      event.ping === "Reachable" ||
+      event.port === "Open"
+    ) {
+      // Check if the event timestamp is within the specified duration
+      return event.timestamp >= thresholdTime;
+    }
+    return false;
+  });
+
+  // If there are no recent events, assume 100% uptime
+  if (recentUptimeEvents.length === 0) {
+    return 100;
+  }
+
+  // Calculate the total duration of uptime within the duration
+  let totalUptimeDuration = 0;
+  let lastTimestamp = thresholdTime;
+
+  recentUptimeEvents.forEach((event) => {
+    const timeDifference = event.timestamp - lastTimestamp;
+    totalUptimeDuration += timeDifference;
+    lastTimestamp = event.timestamp;
+  });
+
+  // Calculate average uptime percentage
+  const totalDuration = durationInMilliseconds;
+  const uptimePercentage = (totalUptimeDuration / totalDuration) * 100;
+
+  return uptimePercentage;
+}
+
+
 
 
 
@@ -696,7 +1100,7 @@ function verifyToken(req, res, next) {
 router.put("/monitors/:id", verifyToken, async (req, res) => {
   try {
     const monitorId = req.params.id;
-    const { url, port, frequency, alertFrequency } = req.body;
+    const { url,name,port,frequency,type,alertFrequency,contacts } = req.body;
 
     // Find the monitor and ensure it belongs to the user
     const monitor = await Monitor.findOne({ _id: monitorId, user: req.user.userId });
@@ -706,6 +1110,8 @@ router.put("/monitors/:id", verifyToken, async (req, res) => {
 
     // Update the monitor fields
     monitor.url = url;
+    monitor.name = name;
+    monitor.type = type;
     monitor.port = port;
     monitor.frequency = frequency;
     monitor.alertFrequency = alertFrequency;
@@ -748,8 +1154,10 @@ router.put("/monitors/:id", verifyToken, async (req, res) => {
 
 // Delete a monitor
 router.delete("/monitors/remove",verifyToken, async (req, res) => {
+  console.log("hit")
   try {
     const monitorId = req.body.monitorId;
+    console.log(monitorId)
    
     // Find the monitor and ensure it belongs to the user
     const monitor = await Monitor.findOne({ _id: monitorId, user: req.user.userId });

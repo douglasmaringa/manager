@@ -80,7 +80,33 @@ router.post("/register", async (req, res) => {
   }
 });
 
+router.post("/resend-code", async (req, res) => {
+  try {
+    const { email } = req.body;
 
+    // Check if the user exists
+    const existingUser = await User.findOne({ email });
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Generate a new verification code
+    const newVerificationCode = Math.floor(100000 + Math.random() * 900000);
+
+    // Update the user's emailCode with the new code
+    existingUser.emailCode = newVerificationCode;
+    await existingUser.save();
+
+    // Send the new verification code to the user's email
+    // Create and save a new alert for registration
+    await createAndSaveAlert(newVerificationCode, email, "Registration");
+
+    res.status(200).json({ message: "Registration code resent successfully" });
+  } catch (error) {
+    console.error("Error resending registration code:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
 
 /**
  * @swagger
@@ -116,6 +142,7 @@ router.post("/register", async (req, res) => {
 router.post("/verify-email", async (req, res) => {
   try {
     const { email, verificationCode } = req.body;
+    
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -220,7 +247,9 @@ router.post("/login", async (req, res) => {
       { expiresIn: "10h" }
     );
 
-    res.status(200).json({ token, userId: user._id });
+    res.status(200).json({ token, userId: user._id,twoFactor:user.
+      isTwoFactorEnabled
+       });
   } catch (error) {
     console.error("Error logging in:", error);
     res.status(500).json({ error: "An internal server error occurred" });
@@ -325,6 +354,8 @@ router.post("/login2fa/code", async (req, res) => {
 router.post("/login2fa", async (req, res) => {
   try {
     const { email, password, twoFactorCode } = req.body;
+
+    console.log(email, password, twoFactorCode)
 
     // Check if the user exists
     const user = await User.findOne({ email });

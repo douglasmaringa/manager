@@ -8,6 +8,9 @@ const uptimeEventSchema = new mongoose.Schema({
     ref: 'Monitor',
     required: true,
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+  },
   timestamp: {
     type: Date,
     required: true,

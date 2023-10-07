@@ -6,6 +6,11 @@ const alertSchema = new mongoose.Schema({
       ref: 'User',
       required: true,
       },
+      monitorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Monitor',
+        required: true,
+        },
       url: {
         type: String,
         required: true,

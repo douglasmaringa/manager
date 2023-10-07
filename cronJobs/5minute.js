@@ -275,6 +275,7 @@ const sendAlert = async (userId,url,id) => {
     
     const newAlert = new Alert({
       userId:userId,
+      monitorId:id,
       url:url,
     });
 
