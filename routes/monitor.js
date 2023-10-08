@@ -1115,6 +1115,7 @@ router.put("/monitors/:id", verifyToken, async (req, res) => {
     monitor.port = port;
     monitor.frequency = frequency;
     monitor.alertFrequency = alertFrequency;
+    monitor.contacts = contacts;
 
     await monitor.save();
 

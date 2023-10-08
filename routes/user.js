@@ -895,8 +895,6 @@ router.delete("/delete-contact",verifyToken, async (req, res) => {
  *                 type: string
  *               userId:
  *                 type: string
- *               contactId:
- *                 type: string
  *     responses:
  *       200:
  *         description: User profile retrieved successfully
@@ -907,9 +905,11 @@ router.delete("/delete-contact",verifyToken, async (req, res) => {
  */
 router.post("/profile",verifyToken, async (req, res) => {
   try {
-    const userId = req.query.userId;
+    const userId = req.body.userId;
 
-    const user = await User.findById(userId, "-password -emailCode -resetCode -deletionCode")
+    console.log(userId)
+
+    const user = await User.findById(userId, "-password -emailCode -resetCode -deletionCode -contacts")
       .populate("monitors", "-_id -userId");
 
     if (!user) {
@@ -922,6 +922,33 @@ router.post("/profile",verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+// Toggle two-factor authentication for a user
+router.post('/toggle', async (req, res) => {
+  try {
+    const userId = req.body.userId;
+    const isTwoFactorEnabled = req.body.isTwoFactorEnabled;
+
+    // Find the user by ID
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isTwoFactorEnabled: isTwoFactorEnabled }, // Toggle the 2FA status
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+
+    // Respond with the updated user
+    res.status(200).json({ message:"success" });
+  } catch (error) {
+    console.error('Error toggling two-factor authentication:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
 
 // Function to create and save an alert
 const createAndSaveAlert = async (message, email ,type) => {
