@@ -43,8 +43,8 @@ const performCronJob30 = async () => {
     // Loop through the pages until all monitors are processed
     while (hasMoreMonitors) {
       monitors = await Monitor.find({
-        frequency: 1,
-        updatedAt: { $lte: new Date(Date.now() - 29 * 60 * 1000) },
+        frequency: 30,
+        updatedAt: { $lte: new Date(Date.now() - 30 * 60 * 1000) },
         isPaused: false
       }).populate('user');
        
@@ -162,6 +162,7 @@ const performCronJob30 = async () => {
         // Create a new uptime event with the obtained data
           uptimeEvent = new UptimeEvent({
           monitor: mongoose.Types.ObjectId(monitor._id),
+          userId: monitor.user,
           timestamp: new Date(),
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
