@@ -1095,6 +1095,7 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
+
 */
 /**
  * @swagger
@@ -1162,7 +1163,7 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
     const { page, search } = req.body;
 
     // Define the page size (number of users per page)
-    const pageSize = 10; // Set your desired page size
+    const pageSize = 1; // Set your desired page size
 
     // Construct the query to search users by email if a search term is provided
     const userQuery = search ? { email: { $regex: search, $options: 'i' } } : {};

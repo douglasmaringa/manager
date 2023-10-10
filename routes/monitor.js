@@ -194,6 +194,7 @@ router.post("/monitors/all", verifyToken, async (req, res) => {
       const avgUptime24h = await calculateAverageUptime(1, monitor._id);
       // Add the calculated stats to each monitor
       monitor.stats = avgUptime24h;
+      
     }
 
     res.status(200).json({ monitors, totalPages });
@@ -955,7 +956,6 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-
 router.post("/monitoring/alluptimestats", verifyToken, async (req, res) => {
   try {
     // Extract user ID from the token
@@ -1032,9 +1032,6 @@ function calculateAverageUptime2(durationInMilliseconds, uptimeEvents) {
 
   return uptimePercentage;
 }
-
-
-
 
 
 // Middleware function to verify the JWT token
