@@ -70,10 +70,12 @@ const performCronJob1 = async () => {
           let lastUptimeStatus;
 
            if(type === "web"){
+            
              lastUptimeStatus = lastUptimeEvent?.availability || "Unknown";
            }else if(type === "ping"){
             lastUptimeStatus = lastUptimeEvent?.ping || "Unknown";
            }else if(type === "port"){
+            
             lastUptimeStatus = lastUptimeEvent?.port || "Unknown";
            }else{
              lastUptimeStatus = "unkown"
@@ -152,7 +154,7 @@ const performCronJob1 = async () => {
         }else if(type === "ping"){
           ping === lastUptimeStatus ? save = false : save = true;
         }else{
-          port === lastUptimeStatus ? save = false : save = true;
+          portResult === lastUptimeStatus ? save = false : save = true;
         }
         
 

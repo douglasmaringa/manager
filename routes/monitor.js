@@ -784,7 +784,7 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
         { ping: 'Unreachable' }
       ]
     }).sort({ timestamp: -1 })
-      .populate('monitor', 'name');
+      .populate('monitor');
 
     if (latestDowntimeEvent) {
       const currentTime = new Date();
@@ -796,7 +796,9 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
         name: latestDowntimeEvent.monitor.name,
         timestamp: latestDowntimeEvent.timestamp,
         duration: downtimeDuration,
+        obj: latestDowntimeEvent
       };
+
 
       res.status(200).json(response);
     } else {
@@ -905,8 +907,11 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
 
       // Determine event type for each event and include timestamp and status
       const eventsWithAvailability = eventsForPage.map((event) => {
+        console.log(event.monitor.type)
         const eventType = determineEventType(event.uptimeEvent);
-        const status = event.uptimeEvent.availability || event.uptimeEvent.ping || event.uptimeEvent.port; // Replace with the actual status field in your UptimeEvent schema
+        console.log(eventType)
+        let status = eventType;
+
 
         return {
           monitorId: event.monitor._id,

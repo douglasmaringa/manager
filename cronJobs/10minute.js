@@ -43,11 +43,10 @@ const performCronJob10 = async () => {
     // Loop through the pages until all monitors are processed
     while (hasMoreMonitors) {
       monitors = await Monitor.find({
-        frequency: 10,
+        frequency: 5,
         updatedAt: { $lte: new Date(Date.now() - 10 * 60 * 1000) },
         isPaused: false
       }).populate('user');
-       
       
       
       console.log(monitors?.length + "monitors found")
@@ -70,10 +69,12 @@ const performCronJob10 = async () => {
           let lastUptimeStatus;
 
            if(type === "web"){
+            
              lastUptimeStatus = lastUptimeEvent?.availability || "Unknown";
            }else if(type === "ping"){
             lastUptimeStatus = lastUptimeEvent?.ping || "Unknown";
            }else if(type === "port"){
+            
             lastUptimeStatus = lastUptimeEvent?.port || "Unknown";
            }else{
              lastUptimeStatus = "unkown"
@@ -152,7 +153,7 @@ const performCronJob10 = async () => {
         }else if(type === "ping"){
           ping === lastUptimeStatus ? save = false : save = true;
         }else{
-          port === lastUptimeStatus ? save = false : save = true;
+          portResult === lastUptimeStatus ? save = false : save = true;
         }
         
 
