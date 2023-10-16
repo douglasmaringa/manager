@@ -9,12 +9,10 @@ const monitorSchema = new mongoose.Schema({
   url: {
     type: String,
     required: true,
-    unique: true,
   },
   name: {
     type: String,
     required: true,
-    unique: true,
   },
   port: {
     type: Number,

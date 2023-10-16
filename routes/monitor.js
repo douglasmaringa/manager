@@ -863,6 +863,97 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
           $match: { userId: mongoose.Types.ObjectId(userId) }
         },
         {
+          $sort: { timestamp: -1 } // Sort by timestamp only
+        },
+        {
+          $lookup: {
+            from: "monitors", // Replace with the actual collection name for monitors
+            localField: "monitor",
+            foreignField: "_id",
+            as: "monitor"
+          },
+        },
+        {
+          $unwind: "$monitor"
+        },
+        {
+          $project: {
+            "monitor.isPaused": 1,
+            "monitor.name": 1,
+            "monitor.type": 1, // Add any other monitor fields you need
+            "_id": 0, // Exclude the _id field if needed
+            uptimeEvent: "$$ROOT",
+          }
+        }
+        
+      ]);
+
+      // Calculate the total number of pages
+      const totalEvents = latestEventsForUser.length;
+      const totalPages = Math.ceil(totalEvents / pageSize);
+
+      // Get events for the specified page
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = page * pageSize;
+      const eventsForPage = latestEventsForUser.slice(startIndex, endIndex);
+
+      // Determine event type for each event and include timestamp and status
+      const eventsWithAvailability = eventsForPage.map((event) => {
+        console.log(event.monitor.type)
+        const eventType = determineEventType(event.uptimeEvent);
+        console.log(eventType)
+        let status = eventType;
+
+
+        return {
+          monitorId: event.monitor._id,
+          isPaused: event.monitor.isPaused,
+          name: event.monitor.name,
+          type: event.monitor.type,
+          timestamp: event.uptimeEvent.timestamp, // Corrected to access timestamp from uptimeEvent
+          status: status,
+          duration: eventType,
+          type: eventType,
+        };
+      });
+
+      return { totalEvents, totalPages, events: eventsWithAvailability };
+    };
+
+    const result = await fetchLatestEventsForUser(userId, page);
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching latest events:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+//old logic for getting updowntime
+/*
+router.post("/monitoring/updown", verifyToken, async (req, res) => {
+  try {
+    // Extract user ID from the token
+    const userId = req.user.userId;
+    const page = req.body.page || 1; // Get the page number from the request body, default to 1 if not provided
+    const pageSize = 10; // Set your desired page size
+
+    // Function to determine event type based on availability, ping, and port
+    const determineEventType = (event) => {
+      if (event.availability === 'Up' || event.ping === 'Reachable' || event.port === 'Open') {
+        return 'Uptime';
+      } else {
+        return 'Downtime';
+      }
+    };
+
+    const fetchLatestEventsForUser = async (userId, page) => {
+      // Find all the latest uptime events for the user and populate the 'monitor' field
+      const latestEventsForUser = await UptimeEvent.aggregate([
+        {
+          $match: { userId: mongoose.Types.ObjectId(userId) }
+        },
+        {
           $sort: { "monitor": 1, timestamp: -1 } // Sort by monitor and timestamp
         },
         {
@@ -936,6 +1027,8 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+*/
 
 
 /**

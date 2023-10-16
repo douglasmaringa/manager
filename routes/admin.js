@@ -1163,7 +1163,7 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
     const { page, search } = req.body;
 
     // Define the page size (number of users per page)
-    const pageSize = 1; // Set your desired page size
+    const pageSize = 10; // Set your desired page size
 
     // Construct the query to search users by email if a search term is provided
     const userQuery = search ? { email: { $regex: search, $options: 'i' } } : {};
@@ -1183,7 +1183,7 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
       .skip(skip)
       .limit(pageSize);
 
-    res.status(200).json({ users, totalPages });
+    res.status(200).json({ users, totalPages ,totalUsers});
   } catch (error) {
     console.error('Error fetching users and monitors:', error);
     res.status(500).json({ error: 'An internal server error occurred' });
@@ -2086,6 +2086,26 @@ router.post("/admin/view-contacts", verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+// Update a user by ID
+router.put('/users/update',verifyToken, async (req, res) => {
+  try {
+    const { userId,updates } = req.body;
+   
+    // Find the user by ID and update the fields
+    const updatedUser = await User.findByIdAndUpdate(userId, updates, { new: true });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 /**
 * @swagger
 * /api/admin/delete-contact:
