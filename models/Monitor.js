@@ -14,6 +14,7 @@ const monitorSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+ 
   port: {
     type: Number,
     required: true,

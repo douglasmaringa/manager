@@ -166,6 +166,7 @@ const performCronJob1 = async () => {
           monitor: mongoose.Types.ObjectId(monitor._id),
           userId: monitor.user,
           timestamp: new Date(),
+          type:monitor.type,
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
           port: portResult === "Open" ? "Open" : "Closed",
@@ -231,6 +232,12 @@ const performCronJob1 = async () => {
         // Save the uptime event to the database
         await uptimeEvent.save();
         }
+
+        if (save === true) {
+          lastUptimeEvent.endTime = new Date(); // Set the end time to the current timestamp
+          await lastUptimeEvent.save(); // Save the updated uptime event
+        }
+        
 
        // Update the 'updatedAt' field of the corresponding monitor
         await Monitor.findByIdAndUpdate(monitor._id, { updatedAt: new Date() });

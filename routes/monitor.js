@@ -701,29 +701,6 @@ router.post("/monitoring/uptime", verifyToken, async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/monitor/monitoring/latest-downtime:
- *   post:
- *     summary: Get latest downtime event
- *     tags: [Monitors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 description: JWT token obtained after login
- *                 example: "your_jwt_token_here"
- *     responses:
- *       200:
- *         description: Latest downtime event retrieved successfully
- *       500:
- *         description: An internal server error occurred
- */
 
 /**
  * @swagger
@@ -748,43 +725,37 @@ router.post("/monitoring/uptime", verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-
-/**
- * @swagger
- * /api/monitor/monitoring/latest-downtime:
- *   post:
- *     summary: Get latest downtime event
- *     tags: [Monitors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 description: JWT token obtained after login
- *                 example: "your_jwt_token_here"
- *     responses:
- *       200:
- *         description: Latest downtime event retrieved successfully
- *       500:
- *         description: An internal server error occurred
- */
-
-// Fetch the latest downtime event from the entire system
 router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
   try {
-    // Find the latest downtime event across all monitors
-    const latestDowntimeEvent = await UptimeEvent.findOne({
-      $or: [
-        { availability: 'Down' },
-        { port: 'Closed' },
-        { ping: 'Unreachable' }
-      ]
-    }).sort({ timestamp: -1 })
-      .populate('monitor');
+    const userId = req.user.userId;
+    
+    // Find the latest downtime event for type "web"
+    const latestDowntimeEventWeb = await UptimeEvent.findOne({
+      userId: userId,
+      type:  "web" ,
+      availability: "Down",
+    }).sort({ timestamp: -1 }).populate('monitor');
+
+    // Find the latest downtime event for type "ping"
+    const latestDowntimeEventPing = await UptimeEvent.findOne({
+      userId: userId,
+      type: "ping",
+      ping: "Unreachable",
+    }).sort({ timestamp: -1 }).populate('monitor');
+
+    // Find the latest downtime event for type "port"
+    const latestDowntimeEventPort = await UptimeEvent.findOne({
+      userId: userId,
+      type: "port",
+      port: "Closed",
+    }).sort({ timestamp: -1 }).populate('monitor');
+
+    // Determine the latest downtime event among the three
+    const latestDowntimeEvent = determineLatestDowntimeEvent(
+      latestDowntimeEventWeb,
+      latestDowntimeEventPing,
+      latestDowntimeEventPort
+    );
 
     if (latestDowntimeEvent) {
       const currentTime = new Date();
@@ -796,9 +767,8 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
         name: latestDowntimeEvent.monitor.name,
         timestamp: latestDowntimeEvent.timestamp,
         duration: downtimeDuration,
-        obj: latestDowntimeEvent
+        obj: latestDowntimeEvent,
       };
-
 
       res.status(200).json(response);
     } else {
@@ -810,6 +780,15 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
   }
 });
 
+function determineLatestDowntimeEvent(...events) {
+  return events.reduce((latestEvent, currentEvent) => {
+    if (!latestEvent) return currentEvent;
+    if (currentEvent && currentEvent.timestamp > latestEvent.timestamp) {
+      return currentEvent;
+    }
+    return latestEvent;
+  }, null);
+}
 
 
 
@@ -911,6 +890,7 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
           name: event.monitor.name,
           type: event.monitor.type,
           timestamp: event.uptimeEvent.timestamp, // Corrected to access timestamp from uptimeEvent
+          endTime: event.uptimeEvent.endTime,
           status: status,
           duration: eventType,
           type: eventType,
@@ -1055,81 +1035,60 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
  *         description: An internal server error occurred
  */
 router.post("/monitoring/alluptimestats", verifyToken, async (req, res) => {
+  const userId = req.user.userId;
   try {
-    // Extract user ID from the token
-    const userId = req.user.userId;
+    // Get all uptime events for the specified user where availability is 'Up' or ping is 'Reachable' or port is 'Open'
+    const uptimeEvents = await UptimeEvent.find({
+      userId,
+      $or: [
+        { availability: 'Up' },
+        { ping: 'Reachable' },
+        { port: 'Open' }
+      ]
+    }).lean();
 
-    // Fetch all uptime events for the user
-    const uptimeEvents = await UptimeEvent.find({ userId });
+    // Calculate the duration for each event
+    const now = new Date();
+    uptimeEvents.forEach(event => {
+      if (event.endTime) {
+        event.duration = event.endTime - event.timestamp;
+      } else {
+        event.duration = now - new Date(event.timestamp);
+      }
+    });
 
-    // Calculate average uptime percentage for the last 24 hours
-    const uptimePercentage24h = calculateAverageUptime2(
-      24 * 60 * 60 * 1000,
-      uptimeEvents
-    );
+    // Calculate 24h, 7d, and 30d percentages
+    const oneDay = 24 * 60 * 60 * 1000;
+    const sevenDays = 7 * oneDay;
+    const thirtyDays = 30 * oneDay;
 
-    // Calculate average uptime percentage for the last 7 days
-    const uptimePercentage7d = calculateAverageUptime2(
-      7 * 24 * 60 * 60 * 1000,
-      uptimeEvents
-    );
+    const calculatePercentage = (duration, timePeriod) => {
+      return Math.min((duration / timePeriod) * 100, 100);
+    };
 
-    // Calculate average uptime percentage for the last 30 days
-    const uptimePercentage30d = calculateAverageUptime2(
-      30 * 24 * 60 * 60 * 1000,
-      uptimeEvents
-    );
+    const uptime24h = uptimeEvents.reduce((total, event) => {
+      return total + (event.duration <= oneDay ? event.duration : 0);
+    }, 0);
+    const uptime7d = uptimeEvents.reduce((total, event) => {
+      return total + (event.duration <= sevenDays ? event.duration : 0);
+    }, 0);
+    const uptime30d = uptimeEvents.reduce((total, event) => {
+      return total + (event.duration <= thirtyDays ? event.duration : 0);
+    }, 0);
 
     res.status(200).json({
-      uptimePercentage24h: uptimePercentage24h.toFixed(2),
-      uptimePercentage7d: uptimePercentage7d.toFixed(2),
-      uptimePercentage30d: uptimePercentage30d.toFixed(2),
+      /*uptimeEvents*/
+      uptimePercentage24h: calculatePercentage(uptime24h, oneDay).toFixed(2),
+      uptimePercentage7d: calculatePercentage(uptime7d, sevenDays).toFixed(2),
+      uptimePercentage30d: calculatePercentage(uptime30d, thirtyDays).toFixed(2)
     });
   } catch (error) {
-    console.error("Error fetching uptime events:", error);
-    res.status(500).json({ error: "An internal server error occurred" });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-function calculateAverageUptime2(durationInMilliseconds, uptimeEvents) {
-  const currentTime = new Date();
-  const thresholdTime = new Date(currentTime - durationInMilliseconds);
 
-  // Filter uptime events within the specified duration
-  const recentUptimeEvents = uptimeEvents.filter((event) => {
-    // Check if availability is "Up," ping is "Reachable," or port is "Open"
-    if (
-      event.availability === "Up" ||
-      event.ping === "Reachable" ||
-      event.port === "Open"
-    ) {
-      // Check if the event timestamp is within the specified duration
-      return event.timestamp >= thresholdTime;
-    }
-    return false;
-  });
-
-  // If there are no recent events, assume 100% uptime
-  if (recentUptimeEvents.length === 0) {
-    return 100;
-  }
-
-  // Calculate the total duration of uptime within the duration
-  let totalUptimeDuration = 0;
-  let lastTimestamp = thresholdTime;
-
-  recentUptimeEvents.forEach((event) => {
-    const timeDifference = event.timestamp - lastTimestamp;
-    totalUptimeDuration += timeDifference;
-    lastTimestamp = event.timestamp;
-  });
-
-  // Calculate average uptime percentage
-  const totalDuration = durationInMilliseconds;
-  const uptimePercentage = (totalUptimeDuration / totalDuration) * 100;
-
-  return uptimePercentage;
-}
 
 
 // Middleware function to verify the JWT token

@@ -15,6 +15,12 @@ const uptimeEventSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  endTime: {
+    type: Date,
+  },
+  type: {
+    type: String,
+  },
   availability: {
     type: String,
     enum: ['Up', 'Down'],
