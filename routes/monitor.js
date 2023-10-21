@@ -759,7 +759,14 @@ router.post("/monitoring/latest-downtime", verifyToken, async (req, res) => {
 
     if (latestDowntimeEvent) {
       const currentTime = new Date();
-      const downtimeDuration = currentTime - latestDowntimeEvent.timestamp;
+      
+      let downtimeDuration;
+
+      if(latestDowntimeEvent.endTime){
+        downtimeDuration = latestDowntimeEvent.endTime - latestDowntimeEvent.timestamp;
+      }else{
+        downtimeDuration = currentTime - latestDowntimeEvent.timestamp;
+      }
 
       // Prepare the response data
       const response = {
@@ -1067,17 +1074,25 @@ router.post("/monitoring/alluptimestats", verifyToken, async (req, res) => {
     };
 
     const uptime24h = uptimeEvents.reduce((total, event) => {
-      return total + (event.duration <= oneDay ? event.duration : 0);
+      // Include the full duration for events with a duration greater than 24 hours
+      const duration24h = event.duration > oneDay ? oneDay : Math.max(event.duration, 0.01 * oneDay);
+      return total + duration24h;
     }, 0);
+    
     const uptime7d = uptimeEvents.reduce((total, event) => {
-      return total + (event.duration <= sevenDays ? event.duration : 0);
+      // Include the full duration for events with a duration greater than 7 days
+      const duration7d = event.duration > sevenDays ? sevenDays : Math.max(event.duration, 0.01 * sevenDays);
+      return total + duration7d;
     }, 0);
+    
     const uptime30d = uptimeEvents.reduce((total, event) => {
-      return total + (event.duration <= thirtyDays ? event.duration : 0);
+      // Include the full duration for events with a duration greater than 30 days
+      const duration30d = event.duration > thirtyDays ? thirtyDays : Math.max(event.duration, 0.01 * thirtyDays);
+      return total + duration30d;
     }, 0);
-
+    
     res.status(200).json({
-      /*uptimeEvents*/
+      uptimeEvents,
       uptimePercentage24h: calculatePercentage(uptime24h, oneDay).toFixed(2),
       uptimePercentage7d: calculatePercentage(uptime7d, sevenDays).toFixed(2),
       uptimePercentage30d: calculatePercentage(uptime30d, thirtyDays).toFixed(2)
