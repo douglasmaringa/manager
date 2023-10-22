@@ -896,7 +896,7 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
           monitorId: event.monitor._id,
           isPaused: event.monitor.isPaused,
           name: event.monitor.name,
-          type: event.monitor.type,
+          type: event.uptimeEvent.type,
           timestamp: event.uptimeEvent.timestamp, // Corrected to access timestamp from uptimeEvent
           endTime: event.uptimeEvent.endTime,
           reason: event.uptimeEvent.reason,

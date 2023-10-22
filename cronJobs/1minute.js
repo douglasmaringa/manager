@@ -71,18 +71,18 @@ const performCronJob1 = async () => {
 
            if(type === "web"){
             
-             lastUptimeStatus = lastUptimeEvent?.availability || "Unknown";
+             lastUptimeStatus = lastUptimeEvent?.availability;
            }else if(type === "ping"){
-            lastUptimeStatus = lastUptimeEvent?.ping || "Unknown";
+            lastUptimeStatus = lastUptimeEvent?.ping;
            }else if(type === "port"){
             
-            lastUptimeStatus = lastUptimeEvent?.port || "Unknown";
+            lastUptimeStatus = lastUptimeEvent?.port;
            }else{
              lastUptimeStatus = "unkown"
            }
 
 
-         
+           
 
 
         // Select the URL based on the current index using the round-robin algorithm
@@ -145,11 +145,13 @@ const performCronJob1 = async () => {
 
         let save;
       
-        let availability = response?.data?.availability || null;
+        let availability = response?.data?.availability || response?.data?.data;
         let ping = response?.data?.ping || null;
         let portResult = response?.data?.port || null;
 
-        console.log(availability,ping,portResult)
+        
+        //console.log("last uptime status",lastUptimeStatus)
+        //console.log("this",availability)
         
         if(type === "web"){
           availability === lastUptimeStatus ? save = false : save = true;

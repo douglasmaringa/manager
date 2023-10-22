@@ -145,7 +145,8 @@ const performCronJob5 = async () => {
 
         let save;
       
-        let availability = response?.data?.availability || null;
+        let availability = response?.data?.availability || response?.data?.data;
+       
         let ping = response?.data?.ping || null;
         let portResult = response?.data?.port || null;
 
