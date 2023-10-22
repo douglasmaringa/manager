@@ -1044,64 +1044,87 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
 router.post("/monitoring/alluptimestats", verifyToken, async (req, res) => {
   const userId = req.user.userId;
   try {
-    // Get all uptime events for the specified user where availability is 'Up' or ping is 'Reachable' or port is 'Open'
-    const uptimeEvents = await UptimeEvent.find({
-      userId,
-      $or: [
-        { availability: 'Up' },
-        { ping: 'Reachable' },
-        { port: 'Open' }
-      ]
-    }).lean();
-
-    // Calculate the duration for each event
-    const now = new Date();
-    uptimeEvents.forEach(event => {
+    // Define a function to calculate event duration
+    const calculateEventDuration = (event, now) => {
       if (event.endTime) {
-        event.duration = event.endTime - event.timestamp;
-      } else {
-        event.duration = now - new Date(event.timestamp);
+        return event.endTime - event.timestamp;
       }
-    });
+      return now - new Date(event.timestamp);
+    };
 
-    // Calculate 24h, 7d, and 30d percentages
+    const now = new Date();
+
+    const eventDurations = [];
+
+    // Uptime events
+    const uptimeEventsQueries = [
+      { type: 'web', status: 'Up', query: { userId, type: 'web', availability: 'Up' } },
+      { type: 'ping', status: 'Up', query: { userId, type: 'ping', ping: 'Reachable' } },
+      { type: 'port', status: 'Up', query: { userId, type: 'port', port: 'Open' } },
+    ];
+
+    // Downtime events
+    const downtimeEventsQueries = [
+      { type: 'web', status: 'Down', query: { userId, type: 'web', availability: 'Down' } },
+      { type: 'ping', status: 'Down', query: { userId, type: 'ping', ping: 'Unreachable' } },
+      { type: 'port', status: 'Down', query: { userId, type: 'port', port: 'Closed' } },
+    ];
+
+    const allEventQueries = [...uptimeEventsQueries, ...downtimeEventsQueries];
+
+    for (const eventQuery of allEventQueries) {
+      const events = await UptimeEvent.find(eventQuery.query).limit(1000).sort({ timestamp: -1 }).lean();
+    
+      for (const event of events) {
+        const duration = calculateEventDuration(event, now);
+        const isActive = !event.endTime; // If it has no endTime, isActive is true
+        const endObject = { type: eventQuery.type, status: eventQuery.status, duration, isActive };
+        eventDurations.push(endObject);
+      }
+    }
+
+    // Calculate total uptime and downtime duration for "Up" and "Down" status events
+    const totalUptimeDuration = eventDurations
+      .filter((event) => event.status === "Up")
+      .reduce((total, event) => total + event.duration, 0);
+
+    const totalDowntimeDuration = eventDurations
+      .filter((event) => event.status === "Down")
+      .reduce((total, event) => total + event.duration, 0);
+
+    // Calculate 24h, 7d, and 30d percentages for both "Up" and "Down" status
     const oneDay = 24 * 60 * 60 * 1000;
     const sevenDays = 7 * oneDay;
     const thirtyDays = 30 * oneDay;
 
-    const calculatePercentage = (duration, timePeriod) => {
-      return Math.min((duration / timePeriod) * 100, 100);
+    const calculatePercentage = (totalDuration, timePeriod) => {
+      return Math.min((totalDuration / timePeriod) * 100, 100);
     };
 
-    const uptime24h = uptimeEvents.reduce((total, event) => {
-      // Include the full duration for events with a duration greater than 24 hours
-      const duration24h = event.duration > oneDay ? oneDay : Math.max(event.duration, 0.01 * oneDay);
-      return total + duration24h;
-    }, 0);
-    
-    const uptime7d = uptimeEvents.reduce((total, event) => {
-      // Include the full duration for events with a duration greater than 7 days
-      const duration7d = event.duration > sevenDays ? sevenDays : Math.max(event.duration, 0.01 * sevenDays);
-      return total + duration7d;
-    }, 0);
-    
-    const uptime30d = uptimeEvents.reduce((total, event) => {
-      // Include the full duration for events with a duration greater than 30 days
-      const duration30d = event.duration > thirtyDays ? thirtyDays : Math.max(event.duration, 0.01 * thirtyDays);
-      return total + duration30d;
-    }, 0);
-    
+    const uptimePercentage24h = calculatePercentage(totalUptimeDuration, oneDay);
+    const downtimePercentage24h = calculatePercentage(totalDowntimeDuration, oneDay);
+
+    const uptimePercentage7d = calculatePercentage(totalUptimeDuration, sevenDays);
+    const downtimePercentage7d = calculatePercentage(totalDowntimeDuration, sevenDays);
+
+    const uptimePercentage30d = calculatePercentage(totalUptimeDuration, thirtyDays);
+    const downtimePercentage30d = calculatePercentage(totalDowntimeDuration, thirtyDays);
+
     res.status(200).json({
-      uptimeEvents,
-      uptimePercentage24h: calculatePercentage(uptime24h, oneDay).toFixed(2),
-      uptimePercentage7d: calculatePercentage(uptime7d, sevenDays).toFixed(2),
-      uptimePercentage30d: calculatePercentage(uptime30d, thirtyDays).toFixed(2)
+      uptimePercentage24h: uptimePercentage24h.toFixed(2),
+      downtimePercentage24h: downtimePercentage24h.toFixed(2),
+      uptimePercentage7d: uptimePercentage7d.toFixed(2),
+      downtimePercentage7d: downtimePercentage7d.toFixed(2),
+      uptimePercentage30d: uptimePercentage30d.toFixed(2),
+      downtimePercentage30d: downtimePercentage30d.toFixed(2),
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 
 

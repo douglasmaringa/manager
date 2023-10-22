@@ -133,7 +133,7 @@ const performCronJob1 = async () => {
           }
         }
 
-        console.log(response)
+        //console.log(response)
 
 
         // Calculate the response time
@@ -169,7 +169,7 @@ const performCronJob1 = async () => {
           userId: monitor.user,
           timestamp: new Date(),
           type:monitor.type,
-          reason:"",
+          reason:monitor.type === "web" ? response?.data?.data?.status : response?.data?.data?.output, 
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
           port: portResult === "Open" ? "Open" : "Closed",
