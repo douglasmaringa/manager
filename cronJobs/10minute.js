@@ -43,10 +43,11 @@ const performCronJob10 = async () => {
     // Loop through the pages until all monitors are processed
     while (hasMoreMonitors) {
       monitors = await Monitor.find({
-        frequency: 5,
+        frequency: 10,
         updatedAt: { $lte: new Date(Date.now() - 10 * 60 * 1000) },
         isPaused: false
       }).populate('user');
+       
       
       
       console.log(monitors?.length + "monitors found")
@@ -132,6 +133,8 @@ const performCronJob10 = async () => {
           }
         }
 
+        //console.log(response)
+
 
         // Calculate the response time
         const endTimestamp = new Date().getTime();
@@ -165,6 +168,8 @@ const performCronJob10 = async () => {
           monitor: mongoose.Types.ObjectId(monitor._id),
           userId: monitor.user,
           timestamp: new Date(),
+          type:monitor.type,
+          reason:monitor.type === "web" ? response?.data?.data?.status : response?.data?.data?.output, 
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
           port: portResult === "Open" ? "Open" : "Closed",
@@ -230,6 +235,12 @@ const performCronJob10 = async () => {
         // Save the uptime event to the database
         await uptimeEvent.save();
         }
+
+        if (save === true) {
+          lastUptimeEvent.endTime = new Date(); // Set the end time to the current timestamp
+          await lastUptimeEvent.save(); // Save the updated uptime event
+        }
+        
 
        // Update the 'updatedAt' field of the corresponding monitor
         await Monitor.findByIdAndUpdate(monitor._id, { updatedAt: new Date() });

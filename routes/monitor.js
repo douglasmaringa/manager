@@ -866,7 +866,8 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
           $project: {
             "monitor.isPaused": 1,
             "monitor.name": 1,
-            "monitor.type": 1, // Add any other monitor fields you need
+            "monitor.type": 1,
+            "monitor.reason": 1, // Add any other monitor fields you need
             "_id": 0, // Exclude the _id field if needed
             uptimeEvent: "$$ROOT",
           }
@@ -898,6 +899,7 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
           type: event.monitor.type,
           timestamp: event.uptimeEvent.timestamp, // Corrected to access timestamp from uptimeEvent
           endTime: event.uptimeEvent.endTime,
+          reason: event.uptimeEvent.reason,
           status: status,
           duration: eventType,
           type: eventType,
