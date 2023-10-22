@@ -888,7 +888,7 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
       const eventsWithAvailability = eventsForPage.map((event) => {
         console.log(event.monitor.type)
         const eventType = determineEventType(event.uptimeEvent);
-        console.log(eventType)
+        //console.log("event",event.uptimeEvent.monitor.type)
         let status = eventType;
 
 
@@ -902,7 +902,7 @@ router.post("/monitoring/updown", verifyToken, async (req, res) => {
           reason: event.uptimeEvent.reason,
           status: status,
           duration: eventType,
-          type: eventType,
+          type: event.uptimeEvent.monitor.type,
         };
       });
 

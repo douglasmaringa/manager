@@ -134,15 +134,12 @@ const performCronJob1 = async () => {
         }
 
         //console.log(response)
-
-
         // Calculate the response time
         const endTimestamp = new Date().getTime();
         const responseTime = endTimestamp - startTimestamp;
 
          
         // Extract the relevant data from the monitor agent response
-
         let save;
       
         let availability = response?.data?.availability || response?.data?.data;
@@ -151,7 +148,7 @@ const performCronJob1 = async () => {
 
         
         //console.log("last uptime status",lastUptimeStatus)
-        //console.log("this",availability)
+        console.log("this",availability,ping,portResult)
         
         if(type === "web"){
           availability === lastUptimeStatus ? save = false : save = true;
@@ -171,7 +168,7 @@ const performCronJob1 = async () => {
           userId: monitor.user,
           timestamp: new Date(),
           type:monitor.type,
-          reason:monitor.type === "web" ? response?.data?.data?.status : response?.data?.data?.output, 
+          reason:response?.data?.status, 
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
           port: portResult === "Open" ? "Open" : "Closed",

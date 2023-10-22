@@ -40,8 +40,8 @@ const performCronJob30 = async () => {
     let monitors;
     let hasMoreMonitors = true;
 
-    // Loop through the pages until all monitors are processed
-    while (hasMoreMonitors) {
+     // Loop through the pages until all monitors are processed
+     while (hasMoreMonitors) {
       monitors = await Monitor.find({
         frequency: 30,
         updatedAt: { $lte: new Date(Date.now() - 30 * 60 * 1000) },
@@ -71,18 +71,18 @@ const performCronJob30 = async () => {
 
            if(type === "web"){
             
-             lastUptimeStatus = lastUptimeEvent?.availability || "Unknown";
+             lastUptimeStatus = lastUptimeEvent?.availability;
            }else if(type === "ping"){
-            lastUptimeStatus = lastUptimeEvent?.ping || "Unknown";
+            lastUptimeStatus = lastUptimeEvent?.ping;
            }else if(type === "port"){
             
-            lastUptimeStatus = lastUptimeEvent?.port || "Unknown";
+            lastUptimeStatus = lastUptimeEvent?.port;
            }else{
              lastUptimeStatus = "unkown"
            }
 
 
-         
+           
 
 
         // Select the URL based on the current index using the round-robin algorithm
@@ -134,23 +134,21 @@ const performCronJob30 = async () => {
         }
 
         //console.log(response)
-
-
         // Calculate the response time
         const endTimestamp = new Date().getTime();
         const responseTime = endTimestamp - startTimestamp;
 
          
         // Extract the relevant data from the monitor agent response
-
         let save;
       
         let availability = response?.data?.availability || response?.data?.data;
-       
         let ping = response?.data?.ping || null;
         let portResult = response?.data?.port || null;
 
-        console.log(availability,ping,portResult)
+        
+        //console.log("last uptime status",lastUptimeStatus)
+        console.log("this",availability,ping,portResult)
         
         if(type === "web"){
           availability === lastUptimeStatus ? save = false : save = true;
@@ -170,7 +168,7 @@ const performCronJob30 = async () => {
           userId: monitor.user,
           timestamp: new Date(),
           type:monitor.type,
-          reason:monitor.type === "web" ? response?.data?.data?.status : response?.data?.data?.output, 
+          reason:response?.data?.status, 
           availability: availability === "Up" ? "Up" : "Down",
           ping: ping === "Reachable" ? "Reachable" : "Unreachable",
           port: portResult === "Open" ? "Open" : "Closed",
@@ -312,3 +310,4 @@ const sendAlert = async (userId,url,id) => {
 
 
 module.exports = performCronJob30;
+
