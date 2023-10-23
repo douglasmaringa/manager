@@ -634,7 +634,7 @@ router.put("/activate", verifyToken, async (req, res) => {
  * @swagger
  * /api/admin/fetchmessage-templates:
  *   post:
- *     summary: Get all message templates with pagination
+ *     summary: Get message templates with pagination and optional type search
  *     tags: [Admin]
  *     requestBody:
  *       required: true
@@ -652,6 +652,10 @@ router.put("/activate", verifyToken, async (req, res) => {
  *                 type: integer
  *                 description: Page number for pagination
  *                 example: 1
+ *               search:
+ *                 type: string
+ *                 description: Type search filter (optional)
+ *                 example: "Up"
  *     responses:
  *       200:
  *         description: Message templates fetched successfully
@@ -671,26 +675,24 @@ router.put("/activate", verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-// Get all message templates with pagination
+// Get message templates with pagination and optional type search
 router.post("/fetchmessage-templates", verifyToken, async (req, res) => {
   try {
-    const clientIpAddress = req?.ip; // Get the client's IP address from the request
-    //console.log(clientIpAddress)
-    // Check if the client's IP address exists in the database
-    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
-
-    if (!ipAddressExists) {
-      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
-    }
-
-    // Extract the page number from the request body
-    const { page } = req.body;
+    // Extract the page number and search parameter from the request body
+    const { page, search } = req.body;
 
     // Define the page size (number of message templates per page)
     const pageSize = 10; // Set your desired page size
 
-    // Count the total number of message templates
-    const totalTemplates = await MessageTemplate.countDocuments();
+    let query = {}; // Initialize an empty query object
+
+    // If a search term is provided, filter by type
+    if (search) {
+      query.type = search; // Filter by the provided type
+    }
+
+    // Count the total number of message templates that match the query
+    const totalTemplates = await MessageTemplate.countDocuments(query);
 
     // Calculate the total pages
     const totalPages = Math.ceil(totalTemplates / pageSize);
@@ -698,17 +700,18 @@ router.post("/fetchmessage-templates", verifyToken, async (req, res) => {
     // Calculate the skip value based on the page number
     const skip = (page - 1) * pageSize;
 
-    // Fetch message templates with pagination
-    const templates = await MessageTemplate.find()
+    // Fetch message templates with pagination and the search query
+    const templates = await MessageTemplate.find(query)
       .skip(skip)
       .limit(pageSize);
 
-    res.status(200).json({ templates, totalPages });
+    res.status(200).json({ templates, totalPages ,totalTemplates});
   } catch (error) {
     console.error("Error fetching message templates:", error);
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
 
 
 /**
@@ -977,129 +980,10 @@ router.put("/user/deactivate",verifyToken, async (req, res) => {
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
-/*
+
 /**
  * @swagger
- * /api/admin/all-users-monitors:
- *   post:
- *     summary: Get all users and their monitors with pagination
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *               - page
- *             properties:
- *               token:
- *                 type: string
- *               page:
- *                 type: integer
- *                 description: Page number for pagination
- *                 example: 1
- *     responses:
- *       200:
- *         description: List of users and their monitors on the current page
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 usersWithMonitors:
- *                   type: array
- *                   description: List of users and their monitors on the current page
- *                 totalPages:
- *                   type: integer
- *                   description: Total number of pages
- *       403:
- *         description: Access Denied you are not an admin
- *       500:
- *         description: An internal server error occurred
- */
-// Get all users and their monitors with pagination
-/*
-router.post('/all-users-monitors', verifyToken, async (req, res) => {
-  try {
-    const clientIpAddress = req?.ip; // Get the client's IP address from the request
-
-    // Check if the client's IP address exists in the database
-    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
-
-    if (!ipAddressExists) {
-      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
-    }
-
-    const admin = await Admin.findById(req.user.userId);
-
-    // Check if the user is an admin
-    if (!admin?.isAdmin) {
-      return res.status(403).json({ error: 'Access Denied you are not an admin' });
-    }
-
-    // Extract the page number from the request body
-    const { page } = req.body;
-
-    // Define the page size (number of users per page)
-    const pageSize = 10; // Set your desired page size
-
-    // Count the total number of users
-    const totalUsers = await User.countDocuments();
-
-    // Calculate the total pages
-    const totalPages = Math.ceil(totalUsers / pageSize);
-
-    // Calculate the skip value based on the page number
-    const skip = (page - 1) * pageSize;
-
-    // Find users with pagination
-    const users = await User.find()
-      .skip(skip)
-      .limit(pageSize);
-
-    const usersWithMonitors = [];
-
-    // Loop through each user and populate their monitors
-    for (const user of users) {
-      const userWithMonitors = {
-        _id: user._id,
-        email: user.email,
-        isActive: user.isActive,
-        monitors: [],
-      };
-
-      const monitors = await Monitor.find({ user: user._id });
-
-      // Populate monitors for the user
-      userWithMonitors.monitors = monitors.map((monitor) => ({
-        _id: monitor._id,
-        url: monitor.url,
-        port: monitor.port,
-        type: monitor.type,
-        isPaused: monitor.isPaused,
-        frequency: monitor.frequency,
-        alertFrequency: monitor.alertFrequency,
-        lastAlertSentAt: monitor.lastAlertSentAt,
-        createdAt: monitor.createdAt,
-        updatedAt: monitor.updatedAt,
-      }));
-
-      usersWithMonitors.push(userWithMonitors);
-    }
-
-    res.status(200).json({ usersWithMonitors, totalPages });
-  } catch (error) {
-    console.error('Error fetching users and monitors:', error);
-    res.status(500).json({ error: 'An internal server error occurred' });
-  }
-});
-
-*/
-/**
- * @swagger
- * /api/admin/all-users-monitors:
+ * /api/admin/all-users:
  *   post:
  *     summary: Get all users with pagination and optional search by email
  *     tags: [Admin]
@@ -1141,7 +1025,7 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-router.post('/all-users-monitors', verifyToken, async (req, res) => {
+router.post('/all-users', verifyToken, async (req, res) => {
   try {
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
 
@@ -1189,6 +1073,111 @@ router.post('/all-users-monitors', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'An internal server error occurred' });
   }
 });
+
+
+router.put('/edit-user', verifyToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.user.userId);
+
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: 'Access Denied you are not an admin' });
+    }
+
+    // Extract user data from the request body
+    const { id,isEmailVerified,isTwoFactorEnabled,maxMonitors,maxContacts,isActive,email,password } = req.body;
+
+    
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update user properties if provided
+    if (isEmailVerified) {
+      user.isEmailVerified = isEmailVerified;
+    }
+    if (isTwoFactorEnabled) {
+      user.isTwoFactorEnabled = isTwoFactorEnabled;
+    }
+
+    if (maxMonitors) {
+      user.maxMonitors = maxMonitors;
+    }
+    if (maxContacts) {
+      user.maxContacts = maxContacts;
+    }
+
+    if (isActive) {
+      user.isActive = isActive;
+    }
+
+    if (email) {
+      user.email = email;
+    }
+
+    if (password) {
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Update the user's password
+      user.password = hashedPassword;
+    }
+
+    // Save the updated user
+    await user.save();
+
+    res.status(200).json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Error updating the user:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
+router.post('/create-user', verifyToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.user.userId);
+
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: 'Access Denied you are not an admin' });
+    }
+   
+
+    // Extract user data from the request body
+    const { email, password,isEmailVerified,emailCode,isTwoFactorEnabled,twoFactorSecret,failedLoginAttempts,lastFailedLoginAt,resetCode,deletionCode,isAdmin,isActive,maxContacts,maxMonitors } = req.body;
+
+    // Create a new user
+    const user = new User({
+      email,
+      password,
+      isEmailVerified,
+      emailCode,
+      isTwoFactorEnabled,
+      twoFactorSecret,
+      failedLoginAttempts,
+      lastFailedLoginAt,
+      resetCode,
+      deletionCode,
+      isAdmin,
+      isActive,
+      maxContacts,
+      maxMonitors
+
+      // Add other user properties as needed
+    });
+
+    // Save the user to the database
+    await user.save();
+
+    res.status(201).json({ message: 'User created successfully' });
+  } catch (error) {
+    console.error('Error creating a new user:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
 
 /**
  * @swagger
@@ -1268,7 +1257,7 @@ router.post('/user-monitors', verifyToken, async (req, res) => {
       monitorQuery = {
         ...monitorQuery,
        
-          url: { $regex: search, $options: 'i' }, // Case-insensitive URL 
+          name: { $regex: search, $options: 'i' }, // Case-insensitive URL 
       };
     }
 
@@ -1283,7 +1272,7 @@ router.post('/user-monitors', verifyToken, async (req, res) => {
       .skip(skip)
       .limit(pageSize);
 
-    res.status(200).json({ monitors, totalPages });
+    res.status(200).json({ monitors, totalPages,totalMonitors });
   } catch (error) {
     console.error('Error fetching monitors for the user:', error);
     res.status(500).json({ error: 'An internal server error occurred' });
@@ -1451,10 +1440,10 @@ router.post("/monitors", verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Access Denied you are not an admin" });
     }
 
-    const { url,port,frequency,type,alertFrequency } = req.body;
+    const { name,url,port,frequency,type,alertFrequency } = req.body;
 
     // Extract user ID from the token
-    const userId = req.body.userId;
+    const userId = req.body.user;
     const port2 =  port || 443;
 
     const user = await User.findById(userId);
@@ -1473,6 +1462,7 @@ router.post("/monitors", verifyToken, async (req, res) => {
     // Create a new monitor for the user
     const newMonitor = new Monitor({
       user: userId,
+      name,
       url,
       type,
       isPaused: false,
@@ -1487,6 +1477,87 @@ router.post("/monitors", verifyToken, async (req, res) => {
     res.status(201).json({ message: "Monitor created successfully" });
   } catch (error) {
     console.error("Error creating monitor:", error);
+    res.status(500).json({ error: "An internal server error occurred" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/monitors/edit:
+ *   put:
+ *     summary: Update a monitor and set isPaused to true
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - id
+ *             properties:
+ *               token:
+ *                 type: string
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Monitor paused successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Access Denied you are not an admin
+ *       404:
+ *         description: Monitor not found
+ *       500:
+ *         description: An internal server error occurred
+ */
+// Update a monitor and set isPaused to true
+router.put("/monitors/edit", verifyToken, async (req, res) => {
+  try {
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+   
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+   
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
+    const admin = await Admin.findById(req.user.userId);
+    
+    // Check if the user is an admin
+    if (!admin?.isAdmin) {
+      return res.status(403).json({ error: "Access Denied you are not an admin" });
+    }
+    
+    const {id, name,user, url, type, isPaused, port, frequency, alertFrequency } = req.body;
+    
+    // Find the monitor and ensure it belongs to the user
+    const monitor = await Monitor.findOne({ _id: id });
+    if (!monitor) {
+      return res.status(404).json({ error: "Monitor not found" });
+    }
+
+    
+
+    monitor.user = user;
+    monitor.type = type;
+    monitor.name = name;
+    monitor.url = url;
+    monitor.type = type;
+    monitor.isPaused = isPaused;
+    monitor.port = port;
+    monitor.frequency = frequency;
+    monitor.alertFrequency = alertFrequency;
+
+
+    await monitor.save();
+
+    res.status(200).json({ message: "Monitor edited successfully" });
+  } catch (error) {
+    console.error("Error editing monitor:", error);
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
@@ -1875,7 +1946,7 @@ router.put('/ip-addresses',verifyToken, async (req, res) => {
  * @swagger
  * /api/admin/all-ips:
  *   post:
- *     summary: Get all IP addresses with pagination
+ *     summary: Get IP addresses with pagination and optional IP address search
  *     tags: [Admin]
  *     requestBody:
  *       required: true
@@ -1893,6 +1964,10 @@ router.put('/ip-addresses',verifyToken, async (req, res) => {
  *                 type: integer
  *                 description: Page number for pagination
  *                 example: 1
+ *               search:
+ *                 type: string
+ *                 description: IP address search filter (optional)
+ *                 example: "192.168.1.1"
  *     responses:
  *       200:
  *         description: List of IP addresses on the current page
@@ -1912,7 +1987,7 @@ router.put('/ip-addresses',verifyToken, async (req, res) => {
  *       500:
  *         description: An internal server error occurred
  */
-// Get all IP addresses with pagination
+// Get IP addresses with pagination and optional search
 router.post('/all-ips', verifyToken, async (req, res) => {
   try {
     const admin = await Admin.findById(req.user.userId);
@@ -1922,14 +1997,21 @@ router.post('/all-ips', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Access Denied you are not an admin' });
     }
 
-    // Extract the page number from the request body
-    const { page } = req.body;
+    // Extract the page number and search parameter from the request body
+    const { page, search } = req.body;
 
     // Define the page size (number of IP addresses per page)
     const pageSize = 10; // Set your desired page size
 
-    // Count the total number of IP addresses
-    const totalIPs = await IpAddress.countDocuments();
+    let query = {}; // Initialize an empty query object
+
+    // If a search term is provided, filter by IP address
+    if (search) {
+      query.address = { $regex: search, $options: 'i' }; // Case-insensitive search
+    }
+
+    // Count the total number of IP addresses that match the query
+    const totalIPs = await IpAddress.countDocuments(query);
 
     // Calculate the total pages
     const totalPages = Math.ceil(totalIPs / pageSize);
@@ -1937,12 +2019,12 @@ router.post('/all-ips', verifyToken, async (req, res) => {
     // Calculate the skip value based on the page number
     const skip = (page - 1) * pageSize;
 
-    // Fetch IP addresses with pagination
-    const ips = await IpAddress.find()
+    // Fetch IP addresses with pagination and the search query
+    const ips = await IpAddress.find(query)
       .skip(skip)
       .limit(pageSize);
 
-    res.status(200).json({ ips, totalPages });
+    res.status(200).json({ ips, totalPages,totalIPs });
   } catch (error) {
     console.error('Error fetching IP addresses:', error);
     res.status(500).json({ error: 'An internal server error occurred' });
@@ -1989,7 +2071,7 @@ router.post('/all-ips', verifyToken, async (req, res) => {
  */
 
 // Add a contact to a user
-router.post("/admin/add-contact", verifyToken, async (req, res) => {
+router.post("/add-contact", verifyToken, async (req, res) => {
   try {
     const { userId, medium, value } = req.body;
 
@@ -2027,9 +2109,41 @@ router.post("/admin/add-contact", verifyToken, async (req, res) => {
   }
 });
 
+router.put('/user/edit-contacts', verifyToken, async (req, res) => {
+  try {
+    const { userId, contacts } = req.body;
+
+    const clientIpAddress = req?.ip; // Get the client's IP address from the request
+    //console.log(clientIpAddress)
+    // Check if the client's IP address exists in the database
+    const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
+
+    if (!ipAddressExists) {
+      return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
+    // Check if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update the user's contacts
+    user.contacts = contacts;
+
+    // Save the updated user
+    await user.save();
+
+    res.status(200).json({ message: 'Contacts edited successfully' });
+  } catch (error) {
+    console.error('Error editing contacts:', error);
+    res.status(500).json({ error: 'An internal server error occurred' });
+  }
+});
+
 /**
  * @swagger
- * /api/admin/view-contacts:
+ * /api/admin/contacts/get:
  *   post:
  *     summary: View contacts for a user
  *     tags: [Admin]
@@ -2059,7 +2173,8 @@ router.post("/admin/add-contact", verifyToken, async (req, res) => {
  */
 
 // View contacts for a user
-router.post("/admin/view-contacts", verifyToken, async (req, res) => {
+router.post("/contacts/get", verifyToken, async (req, res) => {
+  console.log("hit")
   try {
     const { userId } = req.body;
 
@@ -2086,6 +2201,8 @@ router.post("/admin/view-contacts", verifyToken, async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 });
+
+
 
 // Update a user by ID
 router.put('/users/update',verifyToken, async (req, res) => {
@@ -2140,7 +2257,7 @@ router.put('/users/update',verifyToken, async (req, res) => {
 *         description: An internal server error occurred
 */
 // Delete a user's contact
-router.delete("/admin/delete-contact", verifyToken, async (req, res) => {
+router.delete("/delete-contact", verifyToken, async (req, res) => {
   try {
     const { userId, contactId } = req.body;
 
