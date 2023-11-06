@@ -531,7 +531,7 @@ router.post("/reset-password/confirm", async (req, res) => {
  *         description: An internal server error occurred
  */
 // Create a new message template
-router.post("/message-templates",verifyToken, async (req, res) => {
+router.post("/message-templates", async (req, res) => {
   try {
     const { type, message } = req.body;
 
@@ -548,6 +548,11 @@ router.post("/message-templates",verifyToken, async (req, res) => {
     const existingTemplate = await MessageTemplate.findOne({ type });
     if (existingTemplate) {
       return res.status(409).json({ error: `A template with type '${type}' already exists` });
+    }
+
+    // Validate if the message contains the {{error}} placeholder
+    if (!message.includes("{{variable}}")) {
+      return res.status(400).json({ error: 'The message must contain the {{variable}} placeholder' });
     }
 
     // Create a new message template
@@ -760,6 +765,11 @@ router.put("/message-templates/edit",verifyToken, async (req, res) => {
    
     if (!ipAddressExists) {
       return res.status(403).json({ error: 'Access denied. Your IP address is not allowed.' });
+    }
+
+    // Validate if the message contains the {{error}} placeholder
+    if (!message.includes("{{variable}}")) {
+      return res.status(400).json({ error: 'The message must contain the {{variable}} placeholder' });
     }
 
 
