@@ -533,7 +533,7 @@ router.post("/reset-password/confirm", async (req, res) => {
 // Create a new message template
 router.post("/message-templates", async (req, res) => {
   try {
-    const { type, message } = req.body;
+    const { type, message,from,subject } = req.body;
 
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
    
@@ -559,6 +559,8 @@ router.post("/message-templates", async (req, res) => {
     const newTemplate = new MessageTemplate({
       type,
       message,
+      from,
+      subject
     });
 
     // Save the template to the database
@@ -756,7 +758,8 @@ router.post("/fetchmessage-templates", verifyToken, async (req, res) => {
 // Update a message template
 router.put("/message-templates/edit",verifyToken, async (req, res) => {
   try {
-    const {id, type, message } = req.body;
+    const {id, type, message,from,subject } = req.body;
+    console.log(subject)
 
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
    
@@ -782,6 +785,8 @@ router.put("/message-templates/edit",verifyToken, async (req, res) => {
     // Update the template fields
     template.type = type;
     template.message = message;
+    template.from = from;
+    template.subject = subject;
 
     // Save the updated template
     await template.save();
