@@ -48,8 +48,9 @@ router.post("/register", async (req, res) => {
     const { email, password } = req.body;
 
     const clientIpAddress = req?.ip; // Get the client's IP address from the request
-    //console.log(clientIpAddress)
+    console.log(clientIpAddress)
     // Check if the client's IP address exists in the database
+    
     const ipAddressExists = await IpAddress.exists({ address: clientIpAddress });
 
     if (!ipAddressExists) {
