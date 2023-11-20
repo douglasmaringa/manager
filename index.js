@@ -40,7 +40,7 @@ const swaggerSpec = swaggerJsDoc(swaggerOptions);
 async function startServer() {
   try {
     // Connect to MongoDB
-    await mongoose.connect('mongodb://your-username:your-password@185.150.190.136:27017/your-database-name', {
+    await mongoose.connect('mongodb://admin:password@199.127.61.233:27017/monitor', {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
